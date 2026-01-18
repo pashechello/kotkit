@@ -1,0 +1,21 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+.DS_Store
+
+# Local properties
+local.properties
+
+# Build outputs
+app/build/
+output/
+
+# Keystore (keep private)
+*.keystore
+*.jks
+!debug.keystore

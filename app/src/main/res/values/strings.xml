@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AutoPoster</string>
+
+    <string name="accessibility_service_description">AutoPoster uses this service to automate posting videos to TikTok. This service ONLY works with TikTok and cannot access any other apps on your device.\n\nThe service performs automated taps and swipes to navigate TikTok and post your scheduled videos.</string>
+
+    <!-- Notifications -->
+    <string name="notification_channel_posting">Posting Status</string>
+    <string name="notification_channel_alerts">Post Alerts</string>
+    <string name="notification_channel_scheduled">Scheduled Posts</string>
+
+    <!-- Actions -->
+    <string name="action_new_post">New Post</string>
+    <string name="action_schedule">Schedule</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_reschedule">Reschedule</string>
+    <string name="action_save">Save</string>
+
+    <!-- Screens -->
+    <string name="screen_home">Home</string>
+    <string name="screen_queue">Scheduled Posts</string>
+    <string name="screen_history">History</string>
+    <string name="screen_settings">Settings</string>
+
+    <!-- Status -->
+    <string name="status_scheduled">Scheduled</string>
+    <string name="status_posting">Posting…</string>
+    <string name="status_completed">Completed</string>
+    <string name="status_failed">Failed</string>
+    <string name="status_needs_action">Action Needed</string>
+    <string name="status_cancelled">Cancelled</string>
+
+    <!-- Messages -->
+    <string name="message_no_posts">No posts yet</string>
+    <string name="message_create_first_post">Create your first scheduled post</string>
+    <string name="message_accessibility_required">Accessibility service is required for automation</string>
+    <string name="message_unlock_required">Screen unlock credentials are required for scheduled posts</string>
+</resources>
