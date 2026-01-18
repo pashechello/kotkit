@@ -1,7 +1,9 @@
 package com.autoposter.ui.screens.newpost
 
+import android.Manifest
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
@@ -35,6 +37,24 @@ fun NewPostScreen(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
         viewModel.setVideoUri(uri)
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            videoPickerLauncher.launch("video/*")
+        } else {
+            showSnackbar = "Permission denied. Cannot select video."
+        }
+    }
+
+    fun launchVideoPicker() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissionLauncher.launch(Manifest.permission.READ_MEDIA_VIDEO)
+        } else {
+            permissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
+        }
     }
 
     Scaffold(
@@ -93,7 +113,7 @@ fun NewPostScreen(
             // Video picker
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                onClick = { videoPickerLauncher.launch("video/*") }
+                onClick = { launchVideoPicker() }
             ) {
                 Column(
                     modifier = Modifier
@@ -109,7 +129,7 @@ fun NewPostScreen(
                                 .height(213.dp)
                         )
                         Spacer(modifier = Modifier.height(8.dp))
-                        TextButton(onClick = { videoPickerLauncher.launch("video/*") }) {
+                        TextButton(onClick = { launchVideoPicker() }) {
                             Icon(Icons.Default.Refresh, contentDescription = null)
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("Change Video")
@@ -121,7 +141,7 @@ fun NewPostScreen(
                                 .height(213.dp)
                         )
                         Spacer(modifier = Modifier.height(8.dp))
-                        Button(onClick = { videoPickerLauncher.launch("video/*") }) {
+                        Button(onClick = { launchVideoPicker() }) {
                             Icon(Icons.Default.VideoFile, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Select Video")

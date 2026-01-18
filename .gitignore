@@ -19,3 +19,7 @@ output/
 *.keystore
 *.jks
 !debug.keystore
+
+# Built APKs
+*.apk
+output/
