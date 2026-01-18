@@ -1,5 +1,6 @@
 package com.autoposter.ui.screens.home
 
+import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.autoposter.data.local.db.entities.PostEntity
@@ -14,6 +15,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
+    private val application: Application,
     private val postRepository: PostRepository,
     private val settingsRepository: SettingsRepository
 ) : ViewModel() {
@@ -41,7 +43,7 @@ class HomeViewModel @Inject constructor(
                         scheduledCount = queue.count { it.status == PostStatus.SCHEDULED },
                         completedCount = completed.size,
                         totalCount = total,
-                        isAccessibilityEnabled = TikTokAccessibilityService.isServiceEnabled(),
+                        isAccessibilityEnabled = TikTokAccessibilityService.isServiceEnabled(application),
                         hasUnlockCredentials = settingsRepository.hasUnlockCredentials(),
                         isLoading = false
                     )
@@ -52,7 +54,7 @@ class HomeViewModel @Inject constructor(
 
     fun refreshAccessibilityStatus() {
         _uiState.update { state ->
-            state.copy(isAccessibilityEnabled = TikTokAccessibilityService.isServiceEnabled())
+            state.copy(isAccessibilityEnabled = TikTokAccessibilityService.isServiceEnabled(application))
         }
     }
 

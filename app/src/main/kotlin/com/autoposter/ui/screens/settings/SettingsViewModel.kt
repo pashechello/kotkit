@@ -1,5 +1,6 @@
 package com.autoposter.ui.screens.settings
 
+import android.app.Application
 import androidx.lifecycle.ViewModel
 import com.autoposter.data.repository.AuthRepository
 import com.autoposter.data.repository.SettingsRepository
@@ -13,6 +14,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
+    private val application: Application,
     private val settingsRepository: SettingsRepository,
     private val authRepository: AuthRepository
 ) : ViewModel() {
@@ -27,7 +29,7 @@ class SettingsViewModel @Inject constructor(
     fun refreshState() {
         _uiState.update {
             SettingsUiState(
-                isAccessibilityEnabled = TikTokAccessibilityService.isServiceEnabled(),
+                isAccessibilityEnabled = TikTokAccessibilityService.isServiceEnabled(application),
                 hasStoredPin = settingsRepository.hasStoredPin(),
                 hasStoredPassword = settingsRepository.hasStoredPassword(),
                 isLoggedIn = authRepository.isLoggedIn()

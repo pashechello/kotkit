@@ -3,11 +3,14 @@ package com.autoposter.executor.accessibility
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.accessibilityservice.GestureDescription
+import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Path
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
+import android.text.TextUtils
 import android.util.Log
 import android.view.Display
 import android.view.accessibility.AccessibilityEvent
@@ -23,6 +26,7 @@ class TikTokAccessibilityService : AccessibilityService() {
 
     companion object {
         private const val TAG = "TikTokA11yService"
+        private const val SERVICE_ID = "com.autoposter/.executor.accessibility.TikTokAccessibilityService"
 
         // CRITICAL: Only these packages are allowed!
         private val ALLOWED_PACKAGES = setOf(
@@ -35,6 +39,23 @@ class TikTokAccessibilityService : AccessibilityService() {
 
         fun getInstance(): TikTokAccessibilityService? = instance
 
+        /**
+         * Check if accessibility service is enabled in system settings.
+         * This survives app restarts.
+         */
+        fun isServiceEnabled(context: Context): Boolean {
+            val enabledServices = Settings.Secure.getString(
+                context.contentResolver,
+                Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+            ) ?: return false
+
+            return enabledServices.split(':').any {
+                it.equals(SERVICE_ID, ignoreCase = true) ||
+                it.contains("TikTokAccessibilityService", ignoreCase = true)
+            }
+        }
+
+        // Legacy method for backward compatibility
         fun isServiceEnabled(): Boolean = instance != null
     }
 
