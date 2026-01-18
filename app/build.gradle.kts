@@ -36,9 +36,9 @@ android {
         }
         debug {
             isMinifyEnabled = false
-            // Python backend runs on port 8080
-            // 10.0.2.2 = localhost from Android emulator
-            buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:8080/\"")
+            // Backend runs in Docker on port 8080
+            // Use Mac's local IP for real phone testing
+            buildConfigField("String", "API_BASE_URL", "\"http://192.168.0.102:8080/\"")
         }
     }
 
