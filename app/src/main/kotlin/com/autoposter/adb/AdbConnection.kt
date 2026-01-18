@@ -180,7 +180,7 @@ class AdbConnection(
             }
 
             val remoteId = response.arg0
-            ShellStream(this, localId, remoteId)
+            ShellStream(this@AdbConnection, localId, remoteId)
         }
     }
 

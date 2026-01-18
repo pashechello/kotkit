@@ -386,6 +386,16 @@ class AdvancedHumanizer(
     }
 
     /**
+     * Generate log-normal distributed tap duration.
+     */
+    private fun generateLogNormalDuration(): Long {
+        val mu = ln(config.durationMode.toDouble())
+        val sigma = 0.3
+        val sample = exp(mu + sigma * nextGaussian())
+        return sample.toLong().coerceIn(config.durationMin, config.durationMax)
+    }
+
+    /**
      * Generate standard normal random number (Box-Muller).
      */
     private fun nextGaussian(): Double {
