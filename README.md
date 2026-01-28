@@ -24,10 +24,10 @@ https://github.com/pashechello/kotkit
 
 Спросите / Ask:
 ```
-Проанализируй этот Android проект. Есть ли доступ к контактам, SMS, другим приложениям кроме TikTok? Куда отправляются данные?
+Проанализируй этот Android проект. Как работает Accessibility Service и к каким приложениям он имеет доступ? Какие разрешения запрашивает приложение? Какие данные отправляются на сервер?
 ```
 ```
-Analyze this Android app. Does it access contacts, SMS, apps other than TikTok? Where does it send data?
+Analyze this Android app. How does the Accessibility Service work and which apps can it access? What permissions does the app request? What data is sent to the server?
 ```
 
 AI прочитает весь код и скажет что там. / AI will read all code and tell you what's there.
