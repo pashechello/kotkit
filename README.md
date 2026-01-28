@@ -11,6 +11,65 @@ This is the **mobile client app** that works with KotKit's backend AI service. T
 
 For individual creators and content publishers.
 
+---
+
+## 🔍 Verify Code Safety with AI
+
+**Don't trust us - verify yourself!** Use AI to analyze the entire codebase and confirm it's safe:
+
+### Option 1: Claude.ai (Recommended)
+```bash
+# 1. Download repository as ZIP
+curl -L https://github.com/pashechello/kotkit/archive/refs/heads/main.zip -o kotkit.zip
+unzip kotkit.zip
+
+# 2. Visit claude.ai/new
+# 3. Click 📎 Attach files → Upload the entire folder
+# 4. Ask Claude:
+```
+
+**Questions to ask:**
+```
+1. "Analyze this Android app for security issues. Does it:
+   - Access contacts, SMS, or call logs?
+   - Send data to third-party servers (except api.kotkit.pro)?
+   - Request unnecessary permissions?
+   - Contain hidden malicious code?"
+
+2. "What data does this app send to the backend API?"
+
+3. "Can you find any code that accesses apps other than TikTok?"
+
+4. "Does this app store passwords or sensitive data insecurely?"
+```
+
+### Option 2: ChatGPT Code Interpreter
+Same steps as above, use ChatGPT instead.
+
+### Option 3: DeepSeek / Other AI
+```bash
+# Combine all Kotlin code into one file for analysis
+find app/src/main/kotlin -name "*.kt" -exec cat {} \; > all_code.txt
+
+# Upload all_code.txt to any AI (DeepSeek, Gemini, etc.)
+# Ask the same security questions
+```
+
+### Option 4: Manual Code Review
+Key files to check for security:
+- [ApiService.kt](app/src/main/kotlin/com/kotkit/basic/data/remote/api/ApiService.kt) - All API endpoints
+- [NetworkModule.kt](app/src/main/kotlin/com/kotkit/basic/di/NetworkModule.kt) - Backend URL configuration
+- [AndroidManifest.xml](app/src/main/AndroidManifest.xml) - Requested permissions
+- [TikTokAccessibilityService.kt](app/src/main/kotlin/com/kotkit/basic/executor/accessibility/TikTokAccessibilityService.kt) - What the app can access
+
+**Expected findings:**
+- ✅ Backend URL: `https://api.kotkit.pro` only
+- ✅ Permissions: Accessibility, Notifications, Internet (no contacts, SMS, camera)
+- ✅ Accessibility Service: Only accesses TikTok (`com.zhiliaoapp.musically`)
+- ✅ Data sent: Screenshots, UI tree, video metadata (NO personal data)
+
+---
+
 ## Features
 
 ### Personal Mode (Creator Mode)
