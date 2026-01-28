@@ -17,51 +17,73 @@ For individual creators and content publishers.
 
 **Не доверяйте нам - проверьте сами!** / **Don't trust us - verify yourself!**
 
-Используйте AI для анализа всего кода и убедитесь что приложение безопасное:
-Use AI to analyze the entire codebase and confirm it's safe:
+Используйте AI для анализа кода и убедитесь что приложение безопасное:
+Use AI to analyze the code and confirm it's safe:
 
-### Вариант 1 / Option 1: Claude.ai (Рекомендуем / Recommended)
+### Вариант 1 / Option 1: Проверка ключевых файлов (самый простой / easiest)
 
-**Просто дайте ссылку на репозиторий AI:**
-
-1. Откройте / Open → [claude.ai/new](https://claude.ai/new)
-2. Вставьте ссылку / Paste link: `https://github.com/pashechello/kotkit`
-3. Задайте вопрос / Ask Claude:
+**Просто скопируйте эти ссылки в любой AI (Claude, ChatGPT, DeepSeek):**
 
 ```
-Проанализируй этот Android проект на безопасность:
-https://github.com/pashechello/kotkit
+Проанализируй эти файлы Android приложения на безопасность:
+
+1. API endpoints и backend URL:
+https://raw.githubusercontent.com/pashechello/kotkit/main/kotkit-basic/app/src/main/kotlin/com/kotkit/basic/data/remote/api/ApiService.kt
+https://raw.githubusercontent.com/pashechello/kotkit/main/kotkit-basic/app/src/main/kotlin/com/kotkit/basic/di/NetworkModule.kt
+
+2. Разрешения и доступ:
+https://raw.githubusercontent.com/pashechello/kotkit/main/kotkit-basic/app/src/main/AndroidManifest.xml
+https://raw.githubusercontent.com/pashechello/kotkit/main/kotkit-basic/app/src/main/kotlin/com/kotkit/basic/executor/accessibility/TikTokAccessibilityService.kt
 
 Проверь:
-1. Есть ли доступ к контактам, SMS, звонкам?
-2. Отправляются ли данные на сторонние серверы (кроме api.kotkit.pro)?
-3. Есть ли вредоносный код?
-4. Какие данные приложение отправляет на backend?
-5. К каким приложениям кроме TikTok есть доступ?
+- Есть ли доступ к контактам, SMS, звонкам?
+- Отправляются ли данные на сторонние серверы (кроме api.kotkit.pro)?
+- К каким приложениям кроме TikTok есть доступ?
 ```
 
 **English version:**
 ```
-Analyze this Android app for security:
-https://github.com/pashechello/kotkit
+Analyze these Android app files for security:
+
+1. API endpoints and backend URL:
+https://raw.githubusercontent.com/pashechello/kotkit/main/kotkit-basic/app/src/main/kotlin/com/kotkit/basic/data/remote/api/ApiService.kt
+https://raw.githubusercontent.com/pashechello/kotkit/main/kotkit-basic/app/src/main/kotlin/com/kotkit/basic/di/NetworkModule.kt
+
+2. Permissions and access:
+https://raw.githubusercontent.com/pashechello/kotkit/main/kotkit-basic/app/src/main/AndroidManifest.xml
+https://raw.githubusercontent.com/pashechello/kotkit/main/kotkit-basic/app/src/main/kotlin/com/kotkit/basic/executor/accessibility/TikTokAccessibilityService.kt
 
 Check:
-1. Does it access contacts, SMS, or call logs?
-2. Does it send data to third-party servers (except api.kotkit.pro)?
-3. Is there any malicious code?
-4. What data does the app send to backend?
-5. Can it access apps other than TikTok?
+- Does it access contacts, SMS, or call logs?
+- Does it send data to third-party servers (except api.kotkit.pro)?
+- Can it access apps other than TikTok?
 ```
 
-### Вариант 2 / Option 2: ChatGPT
+**Куда вставить / Where to paste:**
+- [Claude.ai](https://claude.ai/new) (рекомендуем / recommended)
+- [ChatGPT](https://chat.openai.com)
+- [DeepSeek](https://chat.deepseek.com)
+- Любой другой AI / Any other AI
 
-Те же шаги, используйте ChatGPT вместо Claude.
-Same steps, use ChatGPT instead.
+AI прочитает файлы напрямую по ссылкам и проанализирует код!
+AI will read the files directly from URLs and analyze the code!
 
-### Вариант 3 / Option 3: DeepSeek / Gemini
+### Вариант 2 / Option 2: Полный анализ всего проекта / Full project analysis
 
-DeepSeek и другие AI тоже могут анализировать GitHub репозитории - просто вставьте ссылку.
-DeepSeek and other AIs can also analyze GitHub repos - just paste the link.
+**Скачать весь проект одним файлом / Download entire project as single file:**
+
+```bash
+# Скачать репозиторий как ZIP / Download repository as ZIP
+curl -L https://github.com/pashechello/kotkit/archive/refs/heads/main.zip -o kotkit.zip
+unzip kotkit.zip
+
+# Загрузить папку kotkit-basic/ в Claude.ai или ChatGPT
+# Upload kotkit-basic/ folder to Claude.ai or ChatGPT
+```
+
+Или используйте / Or use: https://download-directory.github.io/
+- Вставьте / Paste: `https://github.com/pashechello/kotkit/tree/main/kotkit-basic`
+- Скачается только папка с приложением / Downloads only the app folder
 
 ### Вариант 4 / Option 4: Ручная проверка / Manual Review
 
