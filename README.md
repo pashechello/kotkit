@@ -13,60 +13,71 @@ For individual creators and content publishers.
 
 ---
 
-## 🔍 Verify Code Safety with AI
+## 🔍 Проверьте безопасность кода с помощью AI / Verify Code Safety with AI
 
-**Don't trust us - verify yourself!** Use AI to analyze the entire codebase and confirm it's safe:
+**Не доверяйте нам - проверьте сами!** / **Don't trust us - verify yourself!**
 
-### Option 1: Claude.ai (Recommended)
-```bash
-# 1. Download repository as ZIP
-curl -L https://github.com/pashechello/kotkit/archive/refs/heads/main.zip -o kotkit.zip
-unzip kotkit.zip
+Используйте AI для анализа всего кода и убедитесь что приложение безопасное:
+Use AI to analyze the entire codebase and confirm it's safe:
 
-# 2. Visit claude.ai/new
-# 3. Click 📎 Attach files → Upload the entire folder
-# 4. Ask Claude:
+### Вариант 1 / Option 1: Claude.ai (Рекомендуем / Recommended)
+
+**Просто дайте ссылку на репозиторий AI:**
+
+1. Откройте / Open → [claude.ai/new](https://claude.ai/new)
+2. Вставьте ссылку / Paste link: `https://github.com/pashechello/kotkit`
+3. Задайте вопрос / Ask Claude:
+
+```
+Проанализируй этот Android проект на безопасность:
+https://github.com/pashechello/kotkit
+
+Проверь:
+1. Есть ли доступ к контактам, SMS, звонкам?
+2. Отправляются ли данные на сторонние серверы (кроме api.kotkit.pro)?
+3. Есть ли вредоносный код?
+4. Какие данные приложение отправляет на backend?
+5. К каким приложениям кроме TikTok есть доступ?
 ```
 
-**Questions to ask:**
+**English version:**
 ```
-1. "Analyze this Android app for security issues. Does it:
-   - Access contacts, SMS, or call logs?
-   - Send data to third-party servers (except api.kotkit.pro)?
-   - Request unnecessary permissions?
-   - Contain hidden malicious code?"
+Analyze this Android app for security:
+https://github.com/pashechello/kotkit
 
-2. "What data does this app send to the backend API?"
-
-3. "Can you find any code that accesses apps other than TikTok?"
-
-4. "Does this app store passwords or sensitive data insecurely?"
+Check:
+1. Does it access contacts, SMS, or call logs?
+2. Does it send data to third-party servers (except api.kotkit.pro)?
+3. Is there any malicious code?
+4. What data does the app send to backend?
+5. Can it access apps other than TikTok?
 ```
 
-### Option 2: ChatGPT Code Interpreter
-Same steps as above, use ChatGPT instead.
+### Вариант 2 / Option 2: ChatGPT
 
-### Option 3: DeepSeek / Other AI
-```bash
-# Combine all Kotlin code into one file for analysis
-find app/src/main/kotlin -name "*.kt" -exec cat {} \; > all_code.txt
+Те же шаги, используйте ChatGPT вместо Claude.
+Same steps, use ChatGPT instead.
 
-# Upload all_code.txt to any AI (DeepSeek, Gemini, etc.)
-# Ask the same security questions
-```
+### Вариант 3 / Option 3: DeepSeek / Gemini
 
-### Option 4: Manual Code Review
-Key files to check for security:
-- [ApiService.kt](app/src/main/kotlin/com/kotkit/basic/data/remote/api/ApiService.kt) - All API endpoints
-- [NetworkModule.kt](app/src/main/kotlin/com/kotkit/basic/di/NetworkModule.kt) - Backend URL configuration
-- [AndroidManifest.xml](app/src/main/AndroidManifest.xml) - Requested permissions
-- [TikTokAccessibilityService.kt](app/src/main/kotlin/com/kotkit/basic/executor/accessibility/TikTokAccessibilityService.kt) - What the app can access
+DeepSeek и другие AI тоже могут анализировать GitHub репозитории - просто вставьте ссылку.
+DeepSeek and other AIs can also analyze GitHub repos - just paste the link.
 
-**Expected findings:**
-- ✅ Backend URL: `https://api.kotkit.pro` only
-- ✅ Permissions: Accessibility, Notifications, Internet (no contacts, SMS, camera)
-- ✅ Accessibility Service: Only accesses TikTok (`com.zhiliaoapp.musically`)
-- ✅ Data sent: Screenshots, UI tree, video metadata (NO personal data)
+### Вариант 4 / Option 4: Ручная проверка / Manual Review
+
+Ключевые файлы для проверки безопасности / Key files to check:
+- [ApiService.kt](app/src/main/kotlin/com/kotkit/basic/data/remote/api/ApiService.kt) - Все API endpoints / All API endpoints
+- [NetworkModule.kt](app/src/main/kotlin/com/kotkit/basic/di/NetworkModule.kt) - URL backend сервера / Backend URL
+- [AndroidManifest.xml](app/src/main/AndroidManifest.xml) - Запрашиваемые разрешения / Requested permissions
+- [TikTokAccessibilityService.kt](app/src/main/kotlin/com/kotkit/basic/executor/accessibility/TikTokAccessibilityService.kt) - К чему есть доступ / What the app accesses
+
+**Что вы должны найти / Expected findings:**
+- ✅ Backend URL: только `https://api.kotkit.pro` / only `https://api.kotkit.pro`
+- ✅ Permissions: Accessibility, Уведомления, Интернет / Accessibility, Notifications, Internet
+  - ❌ НЕТ / NO: контакты, SMS, камера / contacts, SMS, camera
+- ✅ Accessibility Service: доступ ТОЛЬКО к TikTok / ONLY accesses TikTok (`com.zhiliaoapp.musically`)
+- ✅ Данные на сервер / Data sent: скриншоты, UI дерево, метаданные видео / screenshots, UI tree, video metadata
+  - ❌ НЕ отправляет / NOT sent: личные данные, пароли / personal data, passwords
 
 ---
 
