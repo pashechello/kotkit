@@ -42,7 +42,8 @@ android {
         }
 
         // Production API URL - all AI processing happens on backend
-        buildConfigField("String", "API_BASE_URL", "\"https://api.kotkit.pro/\"")
+        // Deployed on Fly.io: kotkit.pro (landing) + /api/v1/ (backend)
+        buildConfigField("String", "API_BASE_URL", "\"https://kotkit.pro/api/v1/\"")
     }
 
     buildTypes {
