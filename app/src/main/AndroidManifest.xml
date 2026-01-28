@@ -2,9 +2,16 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- Package visibility for TikTok -->
+    <queries>
+        <package android:name="com.zhiliaoapp.musically" />
+        <package android:name="com.ss.android.ugc.trill" />
+    </queries>
+
     <!-- Network -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
 
     <!-- Storage -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
@@ -31,6 +38,9 @@
     <!-- Screen Unlock -->
     <uses-permission android:name="android.permission.DISABLE_KEYGUARD" />
 
+    <!-- Overlay for floating status indicator -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
     <application
         android:name=".App"
         android:allowBackup="false"
@@ -38,6 +48,7 @@
         android:fullBackupContent="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
+        android:localeConfig="@xml/locales_config"
         android:networkSecurityConfig="@xml/network_security_config"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
@@ -54,6 +65,14 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!-- Deep Link for OAuth from website -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="kotkit" android:host="auth" />
+            </intent-filter>
         </activity>
 
         <!-- Accessibility Service -->
@@ -69,31 +88,16 @@
                 android:resource="@xml/accessibility_service_config" />
         </service>
 
-        <!-- Foreground Service -->
-        <service
-            android:name=".scheduler.PostingForegroundService"
-            android:exported="false"
-            android:foregroundServiceType="specialUse">
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="automation" />
-        </service>
-
-        <!-- Alarm Receiver (legacy) -->
-        <receiver
-            android:name=".scheduler.AlarmReceiver"
-            android:exported="false" />
-
         <!-- Smart Scheduler Receiver -->
         <receiver
             android:name=".scheduler.SchedulerReceiver"
             android:exported="false">
             <intent-filter>
-                <action android:name="com.autoposter.ACTION_WARNING" />
-                <action android:name="com.autoposter.ACTION_FINAL_WARNING" />
-                <action android:name="com.autoposter.ACTION_START_POSTING" />
-                <action android:name="com.autoposter.ACTION_CANCEL_POST" />
-                <action android:name="com.autoposter.ACTION_RETRY_POST" />
+                <action android:name="com.kotkit.basic.ACTION_WARNING" />
+                <action android:name="com.kotkit.basic.ACTION_FINAL_WARNING" />
+                <action android:name="com.kotkit.basic.ACTION_START_POSTING" />
+                <action android:name="com.kotkit.basic.ACTION_CANCEL_POST" />
+                <action android:name="com.kotkit.basic.ACTION_RETRY_POST" />
             </intent-filter>
         </receiver>
 
@@ -107,16 +111,76 @@
             </intent-filter>
         </receiver>
 
-        <!-- Wireless Debugging Pairing Receiver -->
+        <!-- Exact Alarm Permission Receiver (Android 12+) -->
         <receiver
-            android:name=".adb.pairing.PairingReceiver"
+            android:name=".permission.ExactAlarmPermissionReceiver"
             android:exported="false">
             <intent-filter>
-                <action android:name="com.autoposter.ACTION_PAIRING_CODE" />
-                <action android:name="com.autoposter.ACTION_CANCEL_PAIRING" />
-                <action android:name="com.autoposter.ACTION_RETRY_PAIRING" />
+                <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
             </intent-filter>
         </receiver>
+
+        <!-- Stop Posting Receiver (for notification Stop button) -->
+        <receiver
+            android:name=".scheduler.StopPostingReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.kotkit.basic.ACTION_STOP_POSTING" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Network Worker Service (Foreground Service for Network Mode) -->
+        <service
+            android:name=".network.NetworkWorkerService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="automation" />
+        </service>
+
+        <!-- Floating Logo Service (Status Indicator) -->
+        <service
+            android:name=".status.FloatingLogoService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="status_indicator" />
+        </service>
+
+        <!-- Disable default WorkManager initializer (using Hilt) -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
+
+        <!-- WorkManager Foreground Service with specialUse type for Android 14+ -->
+        <service
+            android:name="androidx.work.impl.foreground.SystemForegroundService"
+            android:foregroundServiceType="specialUse"
+            tools:node="merge">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="automation" />
+        </service>
+
+        <!-- FileProvider for sharing videos with TikTok via Share Intent -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_provider_paths" />
+        </provider>
 
     </application>
 

@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -5,12 +7,29 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
+// Load local.properties
+val localProps = Properties().apply {
+    val localPropsFile = rootProject.file("local.properties")
+    if (localPropsFile.exists()) {
+        load(localPropsFile.inputStream())
+    }
+}
+
 android {
-    namespace = "com.autoposter"
+    namespace = "com.kotkit.basic"
     compileSdk = 34
 
+    signingConfigs {
+        create("release") {
+            storeFile = file(localProps.getProperty("RELEASE_STORE_FILE", "../autoposter-release.keystore"))
+            storePassword = localProps.getProperty("RELEASE_STORE_PASSWORD", "")
+            keyAlias = localProps.getProperty("RELEASE_KEY_ALIAS", "autoposter")
+            keyPassword = localProps.getProperty("RELEASE_KEY_PASSWORD", "")
+        }
+    }
+
     defaultConfig {
-        applicationId = "com.autoposter"
+        applicationId = "com.kotkit.basic"
         minSdk = 26
         targetSdk = 34
         versionCode = 1
@@ -22,13 +41,15 @@ android {
             useSupportLibrary = true
         }
 
-        buildConfigField("String", "API_BASE_URL", "\"https://api.autoposter.com/\"")
+        // Production API URL - all AI processing happens on backend
+        buildConfigField("String", "API_BASE_URL", "\"https://api.kotkit.pro/\"")
     }
 
     buildTypes {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -36,9 +57,9 @@ android {
         }
         debug {
             isMinifyEnabled = false
-            // Backend runs in Docker on port 8080
-            // Use Mac's local IP for real phone testing
-            buildConfigField("String", "API_BASE_URL", "\"http://192.168.0.102:8080/\"")
+            signingConfig = signingConfigs.getByName("debug")
+            // Debug can use same production backend or override via local.properties
+            // buildConfigField("String", "API_BASE_URL", "\"http://localhost:8080/\"")
         }
     }
 
@@ -60,7 +81,7 @@ android {
     }
 
     composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.6"
+        kotlinCompilerExtensionVersion = "1.5.14"
     }
 
     packaging {
@@ -73,11 +94,13 @@ android {
 dependencies {
     // Core
     implementation("androidx.core:core-ktx:1.12.0")
+    implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
     implementation("androidx.activity:activity-compose:1.8.2")
 
-    // Compose - use newer BOM for animation compatibility
+    // Compose - stable BOM compatible with AGP 8.2
     implementation(platform("androidx.compose:compose-bom:2024.02.00"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
@@ -85,7 +108,16 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.compose.animation:animation")
+    implementation("androidx.compose.foundation:foundation")
     implementation("androidx.navigation:navigation-compose:2.7.7")
+
+    // UI Enhancement Libraries
+    implementation("com.valentinilk.shimmer:compose-shimmer:1.2.0")
+    implementation("dev.chrisbanes.haze:haze:0.7.3")
+    implementation("com.airbnb.android:lottie-compose:6.3.0")
+
+    // Wheel Picker for date/time selection (iOS-style drum picker)
+    implementation("com.github.commandiron:WheelPickerCompose:1.1.11")
 
     // Hilt
     implementation("com.google.dagger:hilt-android:2.50")
@@ -111,18 +143,29 @@ dependencies {
     // Security
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
+    // libadb-android for ADB wireless pairing and connection
+    implementation("com.github.MuntashirAkon:libadb-android:3.1.1") {
+        exclude(group = "org.bouncycastle")
+    }
+    implementation("org.conscrypt:conscrypt-android:2.5.3")
+
+    // BouncyCastle for X509 certificate generation and SPAKE2 EC operations
+    implementation("org.bouncycastle:bcprov-jdk18on:1.77")
+    implementation("org.bouncycastle:bcpkix-jdk18on:1.77")
+
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
-
-    // Cryptography (SPAKE2, ADB pairing)
-    implementation("org.bouncycastle:bcprov-jdk18on:1.77")
-
-    // TLS 1.3 for ADB connection
-    implementation("org.conscrypt:conscrypt-android:2.5.2")
 
     // Coil for image loading
     implementation("io.coil-kt:coil-compose:2.5.0")
     implementation("io.coil-kt:coil-video:2.5.0")
+
+    // Timber for logging (with file logging support)
+    implementation("com.jakewharton.timber:timber:5.0.1")
+
+    // Media3 ExoPlayer for video playback
+    implementation("androidx.media3:media3-exoplayer:1.2.1")
+    implementation("androidx.media3:media3-ui:1.2.1")
 
     // Testing
     testImplementation("junit:junit:4.13.2")
@@ -130,8 +173,19 @@ dependencies {
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
-    androidTestImplementation(platform("androidx.compose:compose-bom:2024.01.00"))
+    androidTestImplementation(platform("androidx.compose:compose-bom:2024.02.00"))
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
+}
+
+configurations.all {
+    resolutionStrategy {
+        force("androidx.activity:activity:1.8.2")
+        force("androidx.activity:activity-ktx:1.8.2")
+        force("androidx.activity:activity-compose:1.8.2")
+        force("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
+        force("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
+        force("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
+    }
 }

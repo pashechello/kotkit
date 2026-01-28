@@ -51,9 +51,10 @@
     public static final android.os.Parcelable$Creator CREATOR;
 }
 
-# Remove logging in release
--assumenosideeffects class android.util.Log {
-    public static *** d(...);
-    public static *** v(...);
-    public static *** i(...);
-}
+# Keep Timber logging in release builds (we use FileLoggingTree for debugging)
+-keep class timber.log.Timber { *; }
+-keep class timber.log.Timber$Tree { *; }
+-keep class com.kotkit.basic.logging.FileLoggingTree { *; }
+
+# NOTE: We keep all logs now because we write them to file for debugging
+# To disable file logging in production, remove FileLoggingTree from App.kt

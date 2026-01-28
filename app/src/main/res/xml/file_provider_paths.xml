@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Internal app files directory for videos -->
+    <!-- Maps to: /data/data/com.autoposter/files/videos/ -->
+    <files-path
+        name="videos"
+        path="videos/" />
+
+    <!-- Internal app cache directory for temporary video files -->
+    <cache-path
+        name="temp_videos"
+        path="videos/" />
+
+    <!-- External files directory (for future expansion) -->
+    <external-files-path
+        name="external_videos"
+        path="videos/" />
+</paths>

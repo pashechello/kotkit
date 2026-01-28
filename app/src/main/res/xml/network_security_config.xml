@@ -8,6 +8,15 @@
         </trust-anchors>
     </debug-overrides>
 
+    <!-- Allow cleartext for local development server (Android emulator and local network) -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">10.0.2.2</domain>
+        <domain includeSubdomains="false">localhost</domain>
+        <!-- Local network development servers -->
+        <domain includeSubdomains="false">192.168.31.113</domain>
+        <domain includeSubdomains="false">192.168.0.102</domain>
+    </domain-config>
+
     <!-- Base config - HTTPS only -->
     <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
@@ -17,11 +26,12 @@
 
     <!-- API domain with certificate pinning -->
     <domain-config cleartextTrafficPermitted="false">
-        <domain includeSubdomains="true">api.autoposter.com</domain>
-        <pin-set expiration="2026-12-31">
-            <!-- Replace with actual pins before production -->
-            <pin digest="SHA-256">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</pin>
-            <pin digest="SHA-256">BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=</pin>
+        <domain includeSubdomains="true">kotkit.pro</domain>
+        <pin-set expiration="2027-01-21">
+            <!-- kotkit.pro Let's Encrypt certificate -->
+            <pin digest="SHA-256">X1AdYvvnwl2Ykm0jWyiYyTOK/nt0NJ2MpbxPdsdcFK8=</pin>
+            <!-- Let's Encrypt ISRG Root X1 (backup) -->
+            <pin digest="SHA-256">C5+lpZ7tcVwmwQIMcRtPbsQtWLABXhQzejna0wHFr8M=</pin>
         </pin-set>
     </domain-config>
 </network-security-config>

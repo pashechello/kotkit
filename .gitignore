@@ -8,18 +8,37 @@ build/
 *.iml
 .DS_Store
 
-# Local properties
+# Local properties (contains SDK path and signing credentials)
 local.properties
 
 # Build outputs
 app/build/
 output/
 
-# Keystore (keep private)
+# Keystore files (NEVER commit production keys!)
 *.keystore
 *.jks
 !debug.keystore
 
-# Built APKs
+# Built APKs and binaries
 *.apk
+*.aab
 output/
+
+# Video files
+*.mp4
+*.mov
+
+# Secrets and credentials
+*.pem
+*.p12
+secrets/
+.env
+.env.*
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Claude Code local files
+.claude/

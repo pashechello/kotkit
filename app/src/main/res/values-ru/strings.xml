@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">KotKit</string>
+
+    <string name="accessibility_service_description">KotKit использует эту службу для автоматической публикации видео в TikTok. Служба работает ТОЛЬКО с TikTok и не имеет доступа к другим приложениям на вашем устройстве.\n\nСлужба выполняет автоматические касания и жесты для навигации в TikTok и публикации запланированных видео.</string>
+
+    <!-- Common -->
+    <string name="back">Назад</string>
+    <string name="enable">Включить</string>
+    <string name="setup">Настроить</string>
+    <string name="see_all">Все</string>
+    <string name="dismiss">Закрыть</string>
+    <string name="save">Сохранить</string>
+    <string name="generate">Сгенерировать</string>
+
+    <!-- Notifications -->
+    <string name="notification_channel_posting">Статус публикации</string>
+    <string name="notification_channel_alerts">Уведомления о постах</string>
+    <string name="notification_channel_scheduled">Запланированные посты</string>
+
+    <!-- Actions -->
+    <string name="action_new_post">Новый пост</string>
+    <string name="action_schedule">Запланировать</string>
+    <string name="action_cancel">Отмена</string>
+    <string name="action_delete">Удалить</string>
+    <string name="action_reschedule">Перенести</string>
+    <string name="action_save">Сохранить</string>
+
+    <!-- Screens -->
+    <string name="screen_home">Главная</string>
+    <string name="screen_queue">Запланированные посты</string>
+    <string name="screen_history">История</string>
+    <string name="screen_settings">Настройки</string>
+
+    <!-- Status -->
+    <string name="status_scheduled">Запланировано</string>
+    <string name="status_posting">Публикация…</string>
+    <string name="status_completed">Завершено</string>
+    <string name="status_failed">Ошибка</string>
+    <string name="status_needs_action">Требуется действие</string>
+    <string name="status_cancelled">Отменено</string>
+
+    <!-- Messages -->
+    <string name="message_no_posts">Нет постов</string>
+    <string name="message_create_first_post">Создайте свой первый запланированный пост</string>
+    <string name="message_accessibility_required">Для автоматизации требуется служба специальных возможностей</string>
+    <string name="message_unlock_required">Для запланированных постов требуются данные разблокировки экрана</string>
+
+    <!-- Settings -->
+    <string name="settings_language">Язык</string>
+    <string name="settings_language_subtitle">Выберите язык приложения</string>
+    <string name="language_russian">Русский</string>
+    <string name="language_english">English</string>
+    <string name="settings_accessibility">Специальные возможности</string>
+    <string name="settings_screen_unlock">Разблокировка экрана</string>
+    <string name="settings_account">Аккаунт</string>
+    <string name="settings_about">О приложении</string>
+    <string name="settings_logged_in">Вход выполнен</string>
+    <string name="settings_tap_to_logout">Нажмите для выхода</string>
+    <string name="settings_login">Войти</string>
+    <string name="settings_sign_in">Войдите в свой аккаунт</string>
+    <string name="settings_login_via_website">Войти через сайт</string>
+    <string name="settings_login_via_website_desc">Откроется браузер для входа через Google</string>
+    <string name="settings_version">Версия</string>
+    <string name="settings_privacy_policy">Политика конфиденциальности</string>
+    <string name="dialog_ok">OK</string>
+
+    <!-- Home Screen -->
+    <string name="home_upcoming_posts">Ближайшие посты</string>
+    <string name="home_failed_posts">Ошибки</string>
+    <string name="home_failed_posts_subtitle">%d постов требуют внимания</string>
+    <string name="home_stats_button">Статистика</string>
+    <string name="home_stats_button_subtitle">%d постов</string>
+    <string name="home_recent_posts">Недавние посты</string>
+    <string name="home_accessibility_service">Служба специальных возможностей</string>
+    <string name="home_accessibility_enabled">Включено</string>
+    <string name="home_accessibility_not_enabled">Не включено</string>
+    <string name="home_screen_unlock">Разблокировка экрана</string>
+    <string name="home_screen_unlock_subtitle">Сохраните PIN/пароль для автоматической разблокировки</string>
+    <string name="home_create_post">Создать пост</string>
+    <string name="home_caption_settings">Настройки стиля подписей</string>
+    <string name="home_caption_settings_subtitle">Настройте AI-генерацию подписей</string>
+
+    <!-- New Post Screen -->
+    <string name="new_post_title">Новый пост</string>
+    <string name="new_post_permission_denied">Разрешение отклонено. Невозможно выбрать видео.</string>
+    <string name="new_post_change_video">Сменить видео</string>
+    <string name="new_post_select_video">Выбрать видео</string>
+    <string name="new_post_caption">Подпись</string>
+    <string name="new_post_caption_placeholder">Напишите подпись или сгенерируйте...</string>
+    <string name="new_post_schedule_for">Запланировать на</string>
+    <string name="new_post_post_now">Опубликовать сейчас</string>
+    <string name="new_post_tap_to_select">Нажмите для выбора одного или нескольких видео</string>
+
+    <!-- Settings Screen -->
+    <string name="settings_accessibility_service">Служба специальных возможностей</string>
+    <string name="settings_accessibility_enabled">Включено — готово к автоматизации TikTok</string>
+    <string name="settings_accessibility_not_enabled">Не включено — требуется для автоматизации</string>
+    <string name="settings_overlay_permission">Плавающий индикатор</string>
+    <string name="settings_overlay_enabled">Включено — иконка статуса будет видна</string>
+    <string name="settings_overlay_not_enabled">Не включено — для экстренной остановки</string>
+    <string name="settings_notification_permission">Уведомления</string>
+    <string name="settings_notification_enabled">Включено — будете видеть статус публикации</string>
+    <string name="settings_notification_not_enabled">Не включено — нужно для отображения прогресса</string>
+    <string name="settings_unlock_credentials">Данные разблокировки</string>
+    <string name="settings_pin_saved">PIN сохранён</string>
+    <string name="settings_password_saved">Пароль сохранён</string>
+    <string name="settings_not_configured">Не настроено — требуется для запланированных постов</string>
+
+    <!-- Caption Preferences Screen -->
+    <string name="caption_prefs_title">Стиль подписей</string>
+    <string name="caption_prefs_saved">Настройки сохранены!</string>
+    <string name="caption_prefs_customize_title">Настройте свой стиль подписей</string>
+    <string name="caption_prefs_customize_desc">Установите предпочтительный тон, стиль и хештеги. AI будет генерировать подписи согласно вашим настройкам.</string>
+    <string name="caption_prefs_use_custom">Использовать свой стиль</string>
+    <string name="caption_prefs_use_custom_desc">Применять ваш стиль к сгенерированным подписям</string>
+    <string name="caption_prefs_style_label">Ваш стиль и предпочтения</string>
+    <string name="caption_prefs_style_placeholder">Например: \'Используй эмодзи, неформальный тон, добавь хештеги #fyp #viral\'</string>
+    <string name="caption_prefs_examples">Примеры:</string>
+    <string name="caption_prefs_funny_title">Весёлый и непринуждённый</string>
+    <string name="caption_prefs_funny_example">Используй эмодзи, будь весёлым, добавь #comedy #funny</string>
+    <string name="caption_prefs_professional_title">Профессиональный</string>
+    <string name="caption_prefs_professional_example">Профессиональный тон, образовательный контент, без эмодзи</string>
+    <string name="caption_prefs_motivational_title">Мотивационный</string>
+    <string name="caption_prefs_motivational_example">Вдохновляющий и воодушевляющий, всегда добавляй #motivation #inspiration #success</string>
+    <string name="caption_prefs_short_title">Короткий и трендовый</string>
+    <string name="caption_prefs_short_example">Подписи до 50 символов, только трендовые хештеги</string>
+
+    <!-- Queue Screen -->
+    <string name="queue_no_scheduled">Нет запланированных постов</string>
+
+    <!-- History Screen -->
+    <string name="history_title">История</string>
+    <string name="history_completed">Завершено (%d)</string>
+    <string name="history_failed">Ошибка (%d)</string>
+    <string name="history_no_completed">Нет завершённых постов</string>
+    <string name="history_no_failed">Нет постов с ошибками</string>
+
+    <!-- Unlock Settings Screen -->
+    <string name="unlock_title">Разблокировка экрана</string>
+    <string name="unlock_info">Ваш PIN или пароль хранится с использованием шифрования Android Keystore.</string>
+    <string name="unlock_lock_type">Тип блокировки</string>
+    <string name="unlock_pin">PIN</string>
+    <string name="unlock_password">Пароль</string>
+    <string name="unlock_enter_pin">Введите PIN устройства</string>
+    <string name="unlock_enter_password">Введите пароль устройства</string>
+    <string name="unlock_toggle_visibility">Показать/скрыть пароль</string>
+    <string name="unlock_saved">Сохранено</string>
+    <string name="unlock_pin_error">PIN должен содержать минимум 4 цифры</string>
+    <string name="unlock_password_error">Пароль не может быть пустым</string>
+    <string name="unlock_clear">Удалить сохранённые данные</string>
+    <string name="unlock_cleared">Данные удалены</string>
+
+    <!-- PostCard Component -->
+    <string name="post_no_caption">(Без подписи)</string>
+    <string name="post_more_options">Ещё</string>
+    <string name="post_today">Сегодня, %s</string>
+    <string name="post_tomorrow">Завтра, %s</string>
+
+    <!-- Audience Personas -->
+    <string name="persona_student_name">Студенты</string>
+    <string name="persona_student_desc">Перед парами, обед, вечер, поздно ночью</string>
+    <string name="persona_worker_name">Офис</string>
+    <string name="persona_worker_desc">Утренняя дорога, обед, после работы</string>
+    <string name="persona_night_owl_name">Совы</string>
+    <string name="persona_night_owl_desc">Поздний подъём, день, вечерний пик</string>
+    <string name="persona_parent_name">Родители</string>
+    <string name="persona_parent_desc">После утренних дел, дневной сон, вечер</string>
+    <string name="persona_general_name">Любая</string>
+    <string name="persona_general_desc">Стандартные пиковые часы</string>
+
+    <!-- Batch Schedule Screen -->
+    <string name="batch_schedule_title">Массовое расписание</string>
+    <string name="batch_schedule_select_videos">Выбрать видео</string>
+    <string name="batch_schedule_videos_selected">Выбрано: %d</string>
+    <string name="batch_schedule_no_videos">Видео не выбраны</string>
+    <string name="batch_schedule_tap_to_select">Нажмите для выбора папки или видео</string>
+    <string name="batch_schedule_audience_type">Целевая аудитория</string>
+    <string name="batch_schedule_audience_desc">Время будет оптимизировано для этой аудитории</string>
+    <string name="batch_schedule_start_date">Дата начала</string>
+    <string name="batch_schedule_videos_per_day">Видео в день</string>
+    <string name="batch_schedule_preview">Превью расписания</string>
+    <string name="batch_schedule_preview_desc">Время рандомизируется ±20 мин для естественности</string>
+    <string name="batch_schedule_day">День %d</string>
+    <string name="batch_schedule_schedule_all">Запланировать всё</string>
+    <string name="batch_schedule_scheduling">Планирование…</string>
+    <string name="batch_schedule_success">Успешно запланировано %d видео!</string>
+    <string name="batch_schedule_error">Ошибка планирования видео</string>
+    <string name="batch_schedule_select_videos_first">Сначала выберите видео</string>
+    <string name="batch_schedule_advanced">Дополнительно</string>
+    <string name="batch_schedule_custom_hours">Выбор часов публикации</string>
+    <string name="batch_schedule_use_custom_hours">Использовать свои часы публикации</string>
+    <string name="batch_schedule_custom_hours_hint">Выберите конкретные часы для публикации</string>
+    <string name="batch_schedule_videos">Видео</string>
+    <string name="batch_schedule_add">Добавить</string>
+    <string name="batch_schedule_settings">Расписание</string>
+    <string name="batch_schedule_per_day">Видео в день</string>
+    <string name="batch_schedule_videos_count">%d видео</string>
+    <string name="batch_schedule_audience">Целевая аудитория</string>
+    <string name="batch_schedule_ai_captions">AI Подписи</string>
+    <string name="batch_schedule_ai_description">Сгенерируйте подписи для всех видео с помощью AI</string>
+    <string name="batch_schedule_generate_all">Сгенерировать для %d видео</string>
+    <string name="batch_schedule_generating_progress">Генерация… %d%%</string>
+    <string name="batch_schedule_post_preview">Превью постов</string>
+    <string name="batch_schedule_days_count">%d дней</string>
+    <string name="batch_schedule_all_posts">Запланировать все %d постов</string>
+    <string name="remove">Удалить</string>
+    <string name="decrease">Уменьшить</string>
+    <string name="increase">Увеличить</string>
+
+    <!-- Exact Alarm Permission -->
+    <string name="exact_alarm_action_fix">Исправить</string>
+    <string name="exact_alarm_settings_title">Публикация вовремя</string>
+    <string name="exact_alarm_settings_enabled">Разрешение получено — посты публикуются точно по расписанию</string>
+    <string name="exact_alarm_settings_disabled">Требуется разрешение — возможны отклонения до 15 минут</string>
+
+    <!-- Proximity Sensor -->
+    <string name="proximity_checking">Проверяю доступность телефона…</string>
+    <string name="proximity_blocked">Телефон в кармане — переносим пост</string>
+    <string name="proximity_clear">Готов к публикации</string>
+
+    <!-- Worker Screen -->
+    <string name="worker_screen_title">Начать зарабатывать</string>
+    <string name="worker_button_money">БАБЛО</string>
+    <string name="worker_coming_soon">Скоро будет доступно</string>
+    <string name="worker_your_income">Ваш доход</string>
+    <string name="worker_available_to_withdraw">$%.2f доступно к выводу</string>
+    <string name="worker_stats_title">Ваша статистика</string>
+    <string name="worker_stats_completed">Выполнено</string>
+    <string name="worker_stats_success_rate">Успешность</string>
+    <string name="worker_stats_rating">Рейтинг</string>
+</resources>

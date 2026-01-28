@@ -1,8 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">AutoPoster</string>
+    <string name="app_name">KotKit</string>
 
-    <string name="accessibility_service_description">AutoPoster uses this service to automate posting videos to TikTok. This service ONLY works with TikTok and cannot access any other apps on your device.\n\nThe service performs automated taps and swipes to navigate TikTok and post your scheduled videos.</string>
+    <string name="accessibility_service_description">KotKit uses this service to automate posting videos to TikTok. This service ONLY works with TikTok and cannot access any other apps on your device.\n\nThe service performs automated taps and swipes to navigate TikTok and post your scheduled videos.</string>
+
+    <!-- Common -->
+    <string name="back">Back</string>
+    <string name="enable">Enable</string>
+    <string name="setup">Setup</string>
+    <string name="see_all">See All</string>
+    <string name="dismiss">Dismiss</string>
+    <string name="save">Save</string>
+    <string name="generate">Generate</string>
 
     <!-- Notifications -->
     <string name="notification_channel_posting">Posting Status</string>
@@ -36,4 +45,188 @@
     <string name="message_create_first_post">Create your first scheduled post</string>
     <string name="message_accessibility_required">Accessibility service is required for automation</string>
     <string name="message_unlock_required">Screen unlock credentials are required for scheduled posts</string>
+
+    <!-- Settings -->
+    <string name="settings_language">Language</string>
+    <string name="settings_language_subtitle">Select app language</string>
+    <string name="language_russian">Русский</string>
+    <string name="language_english">English</string>
+    <string name="settings_accessibility">Accessibility</string>
+    <string name="settings_screen_unlock">Screen Unlock</string>
+    <string name="settings_account">Account</string>
+    <string name="settings_about">About</string>
+    <string name="settings_logged_in">Logged In</string>
+    <string name="settings_tap_to_logout">Tap to logout</string>
+    <string name="settings_login">Login</string>
+    <string name="settings_sign_in">Sign in to your account</string>
+    <string name="settings_login_via_website">Login via Website</string>
+    <string name="settings_login_via_website_desc">Open browser to sign in with Google</string>
+    <string name="settings_version">Version</string>
+    <string name="settings_privacy_policy">Privacy Policy</string>
+    <string name="dialog_ok">OK</string>
+
+    <!-- Home Screen -->
+    <string name="home_upcoming_posts">Upcoming Posts</string>
+    <string name="home_failed_posts">Failed Posts</string>
+    <string name="home_failed_posts_subtitle">%d posts need attention</string>
+    <string name="home_stats_button">Statistics</string>
+    <string name="home_stats_button_subtitle">%d posts</string>
+    <string name="home_recent_posts">Recent Posts</string>
+    <string name="home_accessibility_service">Accessibility Service</string>
+    <string name="home_accessibility_enabled">Enabled</string>
+    <string name="home_accessibility_not_enabled">Not enabled</string>
+    <string name="home_screen_unlock">Screen Unlock</string>
+    <string name="home_screen_unlock_subtitle">Save PIN/password for auto-unlock</string>
+    <string name="home_create_post">Create Post</string>
+    <string name="home_caption_settings">Caption Tone Settings</string>
+    <string name="home_caption_settings_subtitle">Customize AI-generated captions</string>
+
+    <!-- New Post Screen -->
+    <string name="new_post_title">New Post</string>
+    <string name="new_post_permission_denied">Permission denied. Cannot select video.</string>
+    <string name="new_post_change_video">Change Video</string>
+    <string name="new_post_select_video">Select Video</string>
+    <string name="new_post_caption">Caption</string>
+    <string name="new_post_caption_placeholder">Write a caption or generate one...</string>
+    <string name="new_post_schedule_for">Schedule for</string>
+    <string name="new_post_post_now">Post Now</string>
+    <string name="new_post_tap_to_select">Tap to select one or multiple videos</string>
+
+    <!-- Settings Screen -->
+    <string name="settings_accessibility_service">Accessibility Service</string>
+    <string name="settings_accessibility_enabled">Enabled - Ready to automate TikTok</string>
+    <string name="settings_accessibility_not_enabled">Not enabled - Required for automation</string>
+    <string name="settings_overlay_permission">Floating Indicator</string>
+    <string name="settings_overlay_enabled">Enabled - Status icon will appear</string>
+    <string name="settings_overlay_not_enabled">Not enabled - For emergency stop</string>
+    <string name="settings_notification_permission">Notifications</string>
+    <string name="settings_notification_enabled">Enabled - You will see posting status</string>
+    <string name="settings_notification_not_enabled">Not enabled - Required to see progress</string>
+    <string name="settings_unlock_credentials">Unlock Credentials</string>
+    <string name="settings_pin_saved">PIN saved</string>
+    <string name="settings_password_saved">Password saved</string>
+    <string name="settings_not_configured">Not configured - Required for scheduled posts</string>
+
+    <!-- Caption Preferences Screen -->
+    <string name="caption_prefs_title">Caption Style</string>
+    <string name="caption_prefs_saved">Settings saved!</string>
+    <string name="caption_prefs_customize_title">Customize Your Caption Style</string>
+    <string name="caption_prefs_customize_desc">Set your preferred tone, style, and hashtags. The AI will generate captions matching your preferences.</string>
+    <string name="caption_prefs_use_custom">Use Custom Tone</string>
+    <string name="caption_prefs_use_custom_desc">Apply your style to generated captions</string>
+    <string name="caption_prefs_style_label">Your Style &amp; Preferences</string>
+    <string name="caption_prefs_style_placeholder">E.g., \'Use emojis, casual tone, add trending hashtags like #fyp #viral\'</string>
+    <string name="caption_prefs_examples">Examples:</string>
+    <string name="caption_prefs_funny_title">Funny &amp; Casual</string>
+    <string name="caption_prefs_funny_example">Use emojis, keep it funny and lighthearted, add #comedy #funny</string>
+    <string name="caption_prefs_professional_title">Professional</string>
+    <string name="caption_prefs_professional_example">Professional tone, educational content, no emojis</string>
+    <string name="caption_prefs_motivational_title">Motivational</string>
+    <string name="caption_prefs_motivational_example">Inspirational and uplifting, always include #motivation #inspiration #success</string>
+    <string name="caption_prefs_short_title">Short &amp; Trendy</string>
+    <string name="caption_prefs_short_example">Keep captions under 50 characters, use trending hashtags only</string>
+
+    <!-- Queue Screen -->
+    <string name="queue_no_scheduled">No scheduled posts</string>
+
+    <!-- History Screen -->
+    <string name="history_title">History</string>
+    <string name="history_completed">Completed (%d)</string>
+    <string name="history_failed">Failed (%d)</string>
+    <string name="history_no_completed">No completed posts</string>
+    <string name="history_no_failed">No failed posts</string>
+
+    <!-- Unlock Settings Screen -->
+    <string name="unlock_title">Screen Unlock</string>
+    <string name="unlock_info">Your PIN or password is stored securely using Android Keystore encryption.</string>
+    <string name="unlock_lock_type">Lock Type</string>
+    <string name="unlock_pin">PIN</string>
+    <string name="unlock_password">Password</string>
+    <string name="unlock_enter_pin">Enter your device PIN</string>
+    <string name="unlock_enter_password">Enter your device password</string>
+    <string name="unlock_toggle_visibility">Toggle password visibility</string>
+    <string name="unlock_saved">Saved successfully</string>
+    <string name="unlock_pin_error">PIN must be at least 4 digits</string>
+    <string name="unlock_password_error">Password cannot be empty</string>
+    <string name="unlock_clear">Clear Saved Credentials</string>
+    <string name="unlock_cleared">Credentials cleared</string>
+
+    <!-- PostCard Component -->
+    <string name="post_no_caption">(No caption)</string>
+    <string name="post_more_options">More options</string>
+    <string name="post_today">Today, %s</string>
+    <string name="post_tomorrow">Tomorrow, %s</string>
+
+    <!-- Audience Personas -->
+    <string name="persona_student_name">Students</string>
+    <string name="persona_student_desc">Before classes, lunch, evening, late night</string>
+    <string name="persona_worker_name">Office</string>
+    <string name="persona_worker_desc">Morning commute, lunch break, after work</string>
+    <string name="persona_night_owl_name">Night Owls</string>
+    <string name="persona_night_owl_desc">Late riser, afternoon, evening peak</string>
+    <string name="persona_parent_name">Parents</string>
+    <string name="persona_parent_desc">After morning routine, nap time, evening</string>
+    <string name="persona_general_name">General</string>
+    <string name="persona_general_desc">Standard peak hours for most people</string>
+
+    <!-- Batch Schedule Screen -->
+    <string name="batch_schedule_title">Batch Schedule</string>
+    <string name="batch_schedule_select_videos">Select Videos</string>
+    <string name="batch_schedule_videos_selected">%d videos selected</string>
+    <string name="batch_schedule_no_videos">No videos selected</string>
+    <string name="batch_schedule_tap_to_select">Tap to select folder or videos</string>
+    <string name="batch_schedule_audience_type">Target Audience</string>
+    <string name="batch_schedule_audience_desc">Times will be optimized for this audience</string>
+    <string name="batch_schedule_start_date">Start Date</string>
+    <string name="batch_schedule_videos_per_day">Videos Per Day</string>
+    <string name="batch_schedule_preview">Schedule Preview</string>
+    <string name="batch_schedule_preview_desc">Times are randomized ±20 min for natural posting</string>
+    <string name="batch_schedule_day">Day %d</string>
+    <string name="batch_schedule_schedule_all">Schedule All</string>
+    <string name="batch_schedule_scheduling">Scheduling…</string>
+    <string name="batch_schedule_success">Successfully scheduled %d videos!</string>
+    <string name="batch_schedule_error">Error scheduling videos</string>
+    <string name="batch_schedule_select_videos_first">Please select videos first</string>
+    <string name="batch_schedule_advanced">Advanced Settings</string>
+    <string name="batch_schedule_custom_hours">Custom posting hours</string>
+    <string name="batch_schedule_use_custom_hours">Use custom posting hours</string>
+    <string name="batch_schedule_custom_hours_hint">Select specific hours for posting</string>
+    <string name="batch_schedule_videos">Videos</string>
+    <string name="batch_schedule_add">Add</string>
+    <string name="batch_schedule_settings">Schedule</string>
+    <string name="batch_schedule_per_day">Videos per day</string>
+    <string name="batch_schedule_videos_count">%d videos</string>
+    <string name="batch_schedule_audience">Target Audience</string>
+    <string name="batch_schedule_ai_captions">AI Captions</string>
+    <string name="batch_schedule_ai_description">Generate engaging captions for all videos using AI</string>
+    <string name="batch_schedule_generate_all">Generate for %d videos</string>
+    <string name="batch_schedule_generating_progress">Generating… %d%%</string>
+    <string name="batch_schedule_post_preview">Post Preview</string>
+    <string name="batch_schedule_days_count">%d days</string>
+    <string name="batch_schedule_all_posts">Schedule All %d Posts</string>
+    <string name="remove">Remove</string>
+    <string name="decrease">Decrease</string>
+    <string name="increase">Increase</string>
+
+    <!-- Exact Alarm Permission -->
+    <string name="exact_alarm_action_fix">Fix</string>
+    <string name="exact_alarm_settings_title">On-time posting</string>
+    <string name="exact_alarm_settings_enabled">Permission granted - posts are published on time</string>
+    <string name="exact_alarm_settings_disabled">Permission required - timing may vary by up to 15 minutes</string>
+
+    <!-- Proximity Sensor -->
+    <string name="proximity_checking">Checking if phone is accessible…</string>
+    <string name="proximity_blocked">Phone in pocket - rescheduling</string>
+    <string name="proximity_clear">Ready to post</string>
+
+    <!-- Worker Screen -->
+    <string name="worker_screen_title">Start Earning</string>
+    <string name="worker_button_money">MONEY</string>
+    <string name="worker_coming_soon">Coming soon</string>
+    <string name="worker_your_income">Your Income</string>
+    <string name="worker_available_to_withdraw">$%.2f available to withdraw</string>
+    <string name="worker_stats_title">Your Stats</string>
+    <string name="worker_stats_completed">Completed</string>
+    <string name="worker_stats_success_rate">Success</string>
+    <string name="worker_stats_rating">Rating</string>
 </resources>
