@@ -17,89 +17,84 @@ For individual creators and content publishers.
 
 **Не доверяйте нам - проверьте сами!** / **Don't trust us - verify yourself!**
 
-Используйте AI для анализа кода и убедитесь что приложение безопасное:
-Use AI to analyze the code and confirm it's safe:
+Проанализируйте **ВЕСЬ** код приложения с помощью AI - никаких скрытых файлов!
+Analyze **ALL** app code with AI - no hidden files!
 
-### Вариант 1 / Option 1: Проверка ключевых файлов (самый простой / easiest)
+### Способ 1 / Method 1: Вставить ссылку в AI (самый простой / easiest)
 
-**Просто скопируйте эти ссылки в любой AI (Claude, ChatGPT, DeepSeek):**
+**Просто скопируйте это в любой AI:**
 
+**На русском:**
 ```
-Проанализируй эти файлы Android приложения на безопасность:
+Проанализируй весь код этого Android приложения на безопасность:
+https://github.com/pashechello/kotkit
 
-1. API endpoints и backend URL:
-https://raw.githubusercontent.com/pashechello/kotkit/main/kotkit-basic/app/src/main/kotlin/com/kotkit/basic/data/remote/api/ApiService.kt
-https://raw.githubusercontent.com/pashechello/kotkit/main/kotkit-basic/app/src/main/kotlin/com/kotkit/basic/di/NetworkModule.kt
+Проверь ВСЕ файлы в папке kotkit-basic/ и ответь:
 
-2. Разрешения и доступ:
-https://raw.githubusercontent.com/pashechello/kotkit/main/kotkit-basic/app/src/main/AndroidManifest.xml
-https://raw.githubusercontent.com/pashechello/kotkit/main/kotkit-basic/app/src/main/kotlin/com/kotkit/basic/executor/accessibility/TikTokAccessibilityService.kt
+1. Есть ли доступ к контактам, SMS, звонкам, камере, микрофону?
+2. Отправляются ли данные куда-то кроме api.kotkit.pro?
+3. Может ли приложение получить доступ к другим приложениям кроме TikTok?
+4. Есть ли вредоносный код или скрытые функции?
+5. Какие разрешения (permissions) запрашивает приложение?
+6. Какие данные отправляются на backend сервер?
 
-Проверь:
-- Есть ли доступ к контактам, SMS, звонкам?
-- Отправляются ли данные на сторонние серверы (кроме api.kotkit.pro)?
-- К каким приложениям кроме TikTok есть доступ?
+Проанализируй ВСЕ .kt, .xml, .gradle файлы. Не пропускай ничего!
 ```
 
-**English version:**
+**In English:**
 ```
-Analyze these Android app files for security:
+Analyze the entire code of this Android app for security:
+https://github.com/pashechello/kotkit
 
-1. API endpoints and backend URL:
-https://raw.githubusercontent.com/pashechello/kotkit/main/kotkit-basic/app/src/main/kotlin/com/kotkit/basic/data/remote/api/ApiService.kt
-https://raw.githubusercontent.com/pashechello/kotkit/main/kotkit-basic/app/src/main/kotlin/com/kotkit/basic/di/NetworkModule.kt
+Check ALL files in kotkit-basic/ folder and answer:
 
-2. Permissions and access:
-https://raw.githubusercontent.com/pashechello/kotkit/main/kotkit-basic/app/src/main/AndroidManifest.xml
-https://raw.githubusercontent.com/pashechello/kotkit/main/kotkit-basic/app/src/main/kotlin/com/kotkit/basic/executor/accessibility/TikTokAccessibilityService.kt
+1. Does it access contacts, SMS, calls, camera, microphone?
+2. Does it send data anywhere except api.kotkit.pro?
+3. Can it access apps other than TikTok?
+4. Is there any malicious code or hidden features?
+5. What permissions does the app request?
+6. What data is sent to the backend server?
 
-Check:
-- Does it access contacts, SMS, or call logs?
-- Does it send data to third-party servers (except api.kotkit.pro)?
-- Can it access apps other than TikTok?
+Analyze ALL .kt, .xml, .gradle files. Don't skip anything!
 ```
 
 **Куда вставить / Where to paste:**
-- [Claude.ai](https://claude.ai/new) (рекомендуем / recommended)
-- [ChatGPT](https://chat.openai.com)
-- [DeepSeek](https://chat.deepseek.com)
-- Любой другой AI / Any other AI
+- [Claude.ai](https://claude.ai/new) - лучший вариант, понимает GitHub / best option, understands GitHub
+- [ChatGPT](https://chat.openai.com) - тоже работает / works too
+- [DeepSeek](https://chat.deepseek.com) - бесплатный / free
 
-AI прочитает файлы напрямую по ссылкам и проанализирует код!
-AI will read the files directly from URLs and analyze the code!
+### Способ 2 / Method 2: Скачать весь проект и загрузить в AI
 
-### Вариант 2 / Option 2: Полный анализ всего проекта / Full project analysis
+**Быстро через браузер / Quick via browser:**
+1. Откройте / Open: https://download-directory.github.io/
+2. Вставьте / Paste: `https://github.com/pashechello/kotkit/tree/main/kotkit-basic`
+3. Нажмите Download / Click Download
+4. Загрузите скачанную папку в Claude.ai или ChatGPT / Upload folder to Claude.ai or ChatGPT
 
-**Скачать весь проект одним файлом / Download entire project as single file:**
-
+**Или через командную строку / Or via command line:**
 ```bash
-# Скачать репозиторий как ZIP / Download repository as ZIP
+# Скачать весь репозиторий / Download entire repo
 curl -L https://github.com/pashechello/kotkit/archive/refs/heads/main.zip -o kotkit.zip
 unzip kotkit.zip
+cd kotkit-main/kotkit-basic
 
-# Загрузить папку kotkit-basic/ в Claude.ai или ChatGPT
-# Upload kotkit-basic/ folder to Claude.ai or ChatGPT
+# Загрузить папку kotkit-basic/ в AI
+# Upload kotkit-basic/ folder to AI
 ```
 
-Или используйте / Or use: https://download-directory.github.io/
-- Вставьте / Paste: `https://github.com/pashechello/kotkit/tree/main/kotkit-basic`
-- Скачается только папка с приложением / Downloads only the app folder
+### Что должен найти AI / What AI should find:
 
-### Вариант 4 / Option 4: Ручная проверка / Manual Review
+**Безопасно / Safe:**
+- ✅ Backend: ТОЛЬКО `https://api.kotkit.pro` / ONLY `https://api.kotkit.pro`
+- ✅ Permissions: Accessibility, Internet, Notifications, Wake Lock
+- ✅ Accessibility: ТОЛЬКО TikTok / ONLY TikTok (`com.zhiliaoapp.musically`)
+- ✅ Данные / Data sent: скриншоты UI TikTok, accessibility tree, метаданные видео / TikTok UI screenshots, accessibility tree, video metadata
 
-Ключевые файлы для проверки безопасности / Key files to check:
-- [ApiService.kt](app/src/main/kotlin/com/kotkit/basic/data/remote/api/ApiService.kt) - Все API endpoints / All API endpoints
-- [NetworkModule.kt](app/src/main/kotlin/com/kotkit/basic/di/NetworkModule.kt) - URL backend сервера / Backend URL
-- [AndroidManifest.xml](app/src/main/AndroidManifest.xml) - Запрашиваемые разрешения / Requested permissions
-- [TikTokAccessibilityService.kt](app/src/main/kotlin/com/kotkit/basic/executor/accessibility/TikTokAccessibilityService.kt) - К чему есть доступ / What the app accesses
-
-**Что вы должны найти / Expected findings:**
-- ✅ Backend URL: только `https://api.kotkit.pro` / only `https://api.kotkit.pro`
-- ✅ Permissions: Accessibility, Уведомления, Интернет / Accessibility, Notifications, Internet
-  - ❌ НЕТ / NO: контакты, SMS, камера / contacts, SMS, camera
-- ✅ Accessibility Service: доступ ТОЛЬКО к TikTok / ONLY accesses TikTok (`com.zhiliaoapp.musically`)
-- ✅ Данные на сервер / Data sent: скриншоты, UI дерево, метаданные видео / screenshots, UI tree, video metadata
-  - ❌ НЕ отправляет / NOT sent: личные данные, пароли / personal data, passwords
+**НЕ должно быть / Should NOT be:**
+- ❌ Доступ к: контактам, SMS, звонкам, камере, микрофону, другим приложениям / Access to: contacts, SMS, calls, camera, mic, other apps
+- ❌ Отправка данных на сторонние серверы / Sending data to third-party servers
+- ❌ Скрытые сетевые запросы / Hidden network requests
+- ❌ Вредоносный код / Malicious code
 
 ---
 
