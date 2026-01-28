@@ -13,88 +13,24 @@ For individual creators and content publishers.
 
 ---
 
-## 🔍 Проверьте безопасность кода с помощью AI / Verify Code Safety with AI
+## 🔍 Проверьте код сами / Verify the Code
 
-**Не доверяйте нам - проверьте сами!** / **Don't trust us - verify yourself!**
+**Не доверяйте - проверьте!** Don't trust - verify!
 
-Проанализируйте **ВЕСЬ** код приложения с помощью AI - никаких скрытых файлов!
-Analyze **ALL** app code with AI - no hidden files!
-
-### Способ 1 / Method 1: Вставить ссылку в AI (самый простой / easiest)
-
-**Просто скопируйте это в любой AI:**
-
-**На русском:**
+Вставьте ссылку в любой AI (Claude, ChatGPT, DeepSeek):
 ```
-Проанализируй весь код этого Android приложения на безопасность:
 https://github.com/pashechello/kotkit
-
-Проверь ВСЕ файлы в папке kotkit-basic/ и ответь:
-
-1. Есть ли доступ к контактам, SMS, звонкам, камере, микрофону?
-2. Отправляются ли данные куда-то кроме api.kotkit.pro?
-3. Может ли приложение получить доступ к другим приложениям кроме TikTok?
-4. Есть ли вредоносный код или скрытые функции?
-5. Какие разрешения (permissions) запрашивает приложение?
-6. Какие данные отправляются на backend сервер?
-
-Проанализируй ВСЕ .kt, .xml, .gradle файлы. Не пропускай ничего!
 ```
 
-**In English:**
+Спросите / Ask:
 ```
-Analyze the entire code of this Android app for security:
-https://github.com/pashechello/kotkit
-
-Check ALL files in kotkit-basic/ folder and answer:
-
-1. Does it access contacts, SMS, calls, camera, microphone?
-2. Does it send data anywhere except api.kotkit.pro?
-3. Can it access apps other than TikTok?
-4. Is there any malicious code or hidden features?
-5. What permissions does the app request?
-6. What data is sent to the backend server?
-
-Analyze ALL .kt, .xml, .gradle files. Don't skip anything!
+Проанализируй этот Android проект. Есть ли доступ к контактам, SMS, другим приложениям кроме TikTok? Куда отправляются данные?
+```
+```
+Analyze this Android app. Does it access contacts, SMS, apps other than TikTok? Where does it send data?
 ```
 
-**Куда вставить / Where to paste:**
-- [Claude.ai](https://claude.ai/new) - лучший вариант, понимает GitHub / best option, understands GitHub
-- [ChatGPT](https://chat.openai.com) - тоже работает / works too
-- [DeepSeek](https://chat.deepseek.com) - бесплатный / free
-
-### Способ 2 / Method 2: Скачать весь проект и загрузить в AI
-
-**Быстро через браузер / Quick via browser:**
-1. Откройте / Open: https://download-directory.github.io/
-2. Вставьте / Paste: `https://github.com/pashechello/kotkit/tree/main/kotkit-basic`
-3. Нажмите Download / Click Download
-4. Загрузите скачанную папку в Claude.ai или ChatGPT / Upload folder to Claude.ai or ChatGPT
-
-**Или через командную строку / Or via command line:**
-```bash
-# Скачать весь репозиторий / Download entire repo
-curl -L https://github.com/pashechello/kotkit/archive/refs/heads/main.zip -o kotkit.zip
-unzip kotkit.zip
-cd kotkit-main/kotkit-basic
-
-# Загрузить папку kotkit-basic/ в AI
-# Upload kotkit-basic/ folder to AI
-```
-
-### Что должен найти AI / What AI should find:
-
-**Безопасно / Safe:**
-- ✅ Backend: ТОЛЬКО `https://api.kotkit.pro` / ONLY `https://api.kotkit.pro`
-- ✅ Permissions: Accessibility, Internet, Notifications, Wake Lock
-- ✅ Accessibility: ТОЛЬКО TikTok / ONLY TikTok (`com.zhiliaoapp.musically`)
-- ✅ Данные / Data sent: скриншоты UI TikTok, accessibility tree, метаданные видео / TikTok UI screenshots, accessibility tree, video metadata
-
-**НЕ должно быть / Should NOT be:**
-- ❌ Доступ к: контактам, SMS, звонкам, камере, микрофону, другим приложениям / Access to: contacts, SMS, calls, camera, mic, other apps
-- ❌ Отправка данных на сторонние серверы / Sending data to third-party servers
-- ❌ Скрытые сетевые запросы / Hidden network requests
-- ❌ Вредоносный код / Malicious code
+AI прочитает весь код и скажет что там. / AI will read all code and tell you what's there.
 
 ---
 
@@ -316,10 +252,15 @@ All AI/ML processing is server-side. The mobile app contains no local AI models.
 
 ## Security
 
-- SSL certificate pinning for API communication
-- Encrypted storage for tokens and credentials
-- Device integrity verification
-- No hardcoded secrets in source code
+**Full security documentation: [SECURITY.md](SECURITY.md)**
+
+Key points:
+- **Accessibility Service is TikTok-only** - enforced at Android OS level via `packageNames` attribute
+- **3-layer package restriction** - XML manifest + runtime constant + event filtering
+- **Server cannot bypass restrictions** - it can only send action commands, not change which apps are accessible
+- **PIN encrypted with AES-256-GCM** - stored locally, never transmitted to server
+- **SSL certificate pinning** - only communicates with `api.kotkit.pro`
+- **No dangerous permissions** - no contacts, SMS, camera, microphone, location
 
 ## Contributing
 
