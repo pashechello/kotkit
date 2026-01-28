@@ -1,6 +1,15 @@
 # KotKit Basic
 
-Android application for automated video posting to TikTok. Version for individual creators and bloggers.
+**AI-powered Android client for automated TikTok video posting.**
+
+This is the **mobile client app** that works with KotKit's backend AI service. The app sends screenshots to the backend, receives intelligent actions (tap, swipe, type), and executes them via Android Accessibility Service. All AI/VLM processing happens on the server - the app contains **zero AI models** locally.
+
+**Why open source?** Transparency and trust. You can verify that the app only:
+- Accesses TikTok (no other apps)
+- Sends screenshots to backend API for analysis
+- Does NOT collect personal data, passwords, or contacts
+
+For individual creators and content publishers.
 
 ## Features
 
@@ -33,8 +42,6 @@ KotKit Network соединяет бренды (рекламодателей) с
 - **Payout Options** - Withdraw via cryptocurrency, bank cards, or local payment systems (СБП, карты)
 - **Anti-Fraud Protection** - 24-hour verification ensures fair payment
 - **Resume Downloads** - Network interruption recovery for large video files
-
-📚 Подробнее: [docs/network/README.md](../docs/network/README.md)
 
 ## Requirements
 
@@ -102,7 +109,44 @@ EOF
 
 ## How It Works
 
-KotKit Basic uses Android Accessibility Service to automate TikTok video publishing:
+**Client-Server Architecture:**
+
+```
+┌─────────────────────────────────┐
+│   📱 Your Android Device         │
+│                                  │
+│  ┌───────────────────────────┐  │
+│  │  KotKit Basic (this app)  │  │
+│  │                           │  │
+│  │  1. Capture screenshot    │──┼──┐
+│  │  2. Send to backend API   │  │  │  HTTPS + JWT
+│  │  3. Receive action        │◄─┼──┘  (api.kotkit.pro)
+│  │  4. Execute via           │  │
+│  │     AccessibilityService  │  │
+│  └───────────────────────────┘  │
+│                                  │
+│  ┌───────────────────────────┐  │
+│  │     TikTok App            │  │
+│  │  (automated by above)     │  │
+│  └───────────────────────────┘  │
+└─────────────────────────────────┘
+                │
+                │ Screenshot (JPEG, 720x1440)
+                │ UI Tree (accessibility nodes)
+                ▼
+┌─────────────────────────────────┐
+│  ☁️  KotKit Backend (closed)    │
+│                                  │
+│  - Vision-Language Model (VLM)  │
+│  - AI decision making            │
+│  - Action planning               │
+│                                  │
+│  Returns: {action: "tap",        │
+│            x: 540, y: 960}       │
+└─────────────────────────────────┘
+```
+
+**Publishing Flow:**
 
 1. **Unlock Screen** - Automatically unlocks the device if needed
 2. **Launch TikTok** - Opens TikTok via share intent with the video
@@ -111,7 +155,17 @@ KotKit Basic uses Android Accessibility Service to automate TikTok video publish
 5. **Publish** - Taps the publish button and verifies success
 6. **Extract Link** - Copies the published video URL for tracking
 
-All AI/VLM processing happens on the backend server - the mobile app only sends screenshots and executes UI actions.
+**What stays on device:**
+- Video files (in your gallery)
+- Posting history (SQLite database)
+- Encrypted credentials (Android Keystore)
+
+**What goes to backend:**
+- Screenshots of TikTok UI (for AI analysis)
+- UI accessibility tree (button coordinates)
+- Task context (caption, video filename)
+
+**No AI models on device** - all intelligence is server-side. This keeps the app small, fast, and allows us to improve the AI without requiring app updates.
 
 ## Architecture
 
