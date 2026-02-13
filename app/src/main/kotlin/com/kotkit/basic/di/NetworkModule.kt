@@ -4,6 +4,7 @@ import com.kotkit.basic.BuildConfig
 import com.kotkit.basic.data.local.preferences.EncryptedPreferences
 import com.kotkit.basic.data.remote.api.ApiService
 import com.kotkit.basic.data.remote.api.AuthInterceptor
+import com.kotkit.basic.data.remote.api.CorrelationIdInterceptor
 import com.kotkit.basic.data.remote.api.RetryInterceptor
 import com.kotkit.basic.data.remote.api.TokenAuthenticator
 import com.kotkit.basic.security.SSLPinning
@@ -40,13 +41,13 @@ object NetworkModule {
         return AuthInterceptor(encryptedPreferences)
     }
 
+    // TokenAuthenticator is created by Hilt via @Inject constructor
+    // (it needs Provider<AuthStateManager> to avoid circular dependency)
+
     @Provides
     @Singleton
-    fun provideTokenAuthenticator(
-        encryptedPreferences: EncryptedPreferences,
-        gson: Gson
-    ): TokenAuthenticator {
-        return TokenAuthenticator(encryptedPreferences, gson)
+    fun provideCorrelationIdInterceptor(): CorrelationIdInterceptor {
+        return CorrelationIdInterceptor()
     }
 
     @Provides
@@ -74,12 +75,14 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideOkHttpClient(
+        correlationIdInterceptor: CorrelationIdInterceptor,
         authInterceptor: AuthInterceptor,
         tokenAuthenticator: TokenAuthenticator,
         retryInterceptor: RetryInterceptor,
         loggingInterceptor: HttpLoggingInterceptor
     ): OkHttpClient {
         val builder = OkHttpClient.Builder()
+            .addInterceptor(correlationIdInterceptor) // First: add correlation ID to all requests
             .addInterceptor(authInterceptor)
             .addInterceptor(retryInterceptor)
             .addInterceptor(loggingInterceptor)

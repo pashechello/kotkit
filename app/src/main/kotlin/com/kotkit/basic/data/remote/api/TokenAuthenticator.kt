@@ -1,6 +1,6 @@
 package com.kotkit.basic.data.remote.api
 
-import android.util.Log
+import com.kotkit.basic.auth.AuthStateManager
 import com.kotkit.basic.data.local.preferences.EncryptedPreferences
 import com.kotkit.basic.data.remote.api.models.RefreshTokenRequest
 import com.google.gson.Gson
@@ -11,8 +11,10 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import okhttp3.Route
+import timber.log.Timber
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
+import javax.inject.Provider
 import javax.inject.Singleton
 
 /**
@@ -22,7 +24,9 @@ import javax.inject.Singleton
 @Singleton
 class TokenAuthenticator @Inject constructor(
     private val encryptedPreferences: EncryptedPreferences,
-    private val gson: Gson
+    private val gson: Gson,
+    // Use Provider to avoid circular dependency during DI setup
+    private val authStateManagerProvider: Provider<AuthStateManager>
 ) : Authenticator {
 
     companion object {
@@ -33,31 +37,34 @@ class TokenAuthenticator @Inject constructor(
     @Volatile
     private var isRefreshing = false
 
+    // Lock object for waiting on refresh completion
+    private val refreshLock = Object()
+
     override fun authenticate(route: Route?, response: Response): Request? {
         // Don't retry if we've already tried multiple times
         val retryCount = response.request.header("Retry-Count")?.toIntOrNull() ?: 0
         if (retryCount >= MAX_RETRIES) {
-            Log.w(TAG, "Max retries reached, giving up")
+            Timber.tag(TAG).w( "Max retries reached, giving up")
             return null
         }
 
         // Don't try to refresh if there's no refresh token
         val refreshToken = encryptedPreferences.refreshToken
         if (refreshToken.isNullOrBlank()) {
-            Log.w(TAG, "No refresh token available")
+            Timber.tag(TAG).w( "No refresh token available")
             clearAuthAndReturn()
             return null
         }
 
         // Synchronize to prevent multiple simultaneous refresh attempts
-        synchronized(this) {
+        synchronized(refreshLock) {
             // Check if token was already refreshed by another request
             val currentToken = encryptedPreferences.authToken
             val requestToken = response.request.header("Authorization")?.removePrefix("Bearer ")
 
             if (currentToken != null && currentToken != requestToken) {
                 // Token was refreshed by another request, retry with new token
-                Log.i(TAG, "Token was refreshed by another request, retrying")
+                Timber.tag(TAG).i( "Token was refreshed by another request, retrying")
                 return response.request.newBuilder()
                     .header("Authorization", "Bearer $currentToken")
                     .header("Retry-Count", (retryCount + 1).toString())
@@ -65,7 +72,26 @@ class TokenAuthenticator @Inject constructor(
             }
 
             if (isRefreshing) {
-                // Another thread is refreshing, wait and retry
+                // Another thread is refreshing, wait for it to complete
+                Timber.tag(TAG).d("Waiting for token refresh by another thread")
+                try {
+                    refreshLock.wait(30_000) // Wait up to 30 seconds
+                } catch (e: InterruptedException) {
+                    Timber.tag(TAG).w("Interrupted while waiting for token refresh")
+                    return null
+                }
+
+                // After waiting, check if we now have a new token
+                val newToken = encryptedPreferences.authToken
+                if (newToken != null && newToken != requestToken) {
+                    Timber.tag(TAG).i("Got new token after waiting, retrying")
+                    return response.request.newBuilder()
+                        .header("Authorization", "Bearer $newToken")
+                        .header("Retry-Count", (retryCount + 1).toString())
+                        .build()
+                }
+                // If still no new token, give up
+                Timber.tag(TAG).w("No new token after waiting")
                 return null
             }
 
@@ -76,7 +102,7 @@ class TokenAuthenticator @Inject constructor(
             val newToken = refreshTokenSync(refreshToken)
 
             return if (newToken != null) {
-                Log.i(TAG, "Token refreshed successfully")
+                Timber.tag(TAG).i( "Token refreshed successfully")
                 encryptedPreferences.authToken = newToken
 
                 response.request.newBuilder()
@@ -84,13 +110,14 @@ class TokenAuthenticator @Inject constructor(
                     .header("Retry-Count", (retryCount + 1).toString())
                     .build()
             } else {
-                Log.w(TAG, "Token refresh failed")
+                Timber.tag(TAG).w( "Token refresh failed")
                 clearAuthAndReturn()
                 null
             }
         } finally {
-            synchronized(this) {
+            synchronized(refreshLock) {
                 isRefreshing = false
+                refreshLock.notifyAll() // Wake up all waiting threads
             }
         }
     }
@@ -108,7 +135,7 @@ class TokenAuthenticator @Inject constructor(
         val requestBody = gson.toJson(RefreshTokenRequest(refreshToken))
             .toRequestBody("application/json".toMediaType())
 
-        val baseUrl = encryptedPreferences.serverUrl ?: "https://kotkit.pro/"
+        val baseUrl = encryptedPreferences.serverUrl ?: "https://kotkit-app.fly.dev/"
         val request = Request.Builder()
             .url("${baseUrl}api/v1/auth/refresh")
             .post(requestBody)
@@ -134,12 +161,19 @@ class TokenAuthenticator @Inject constructor(
                 null
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error refreshing token", e)
+            Timber.tag(TAG).e(e, "Error refreshing token")
             null
         }
     }
 
     private fun clearAuthAndReturn() {
+        Timber.tag(TAG).w("Clearing auth and notifying AuthStateManager")
         encryptedPreferences.clearAuth()
+        // Notify AuthStateManager about token expiration
+        try {
+            authStateManagerProvider.get().onTokenExpired()
+        } catch (e: Exception) {
+            Timber.tag(TAG).e(e, "Failed to notify AuthStateManager")
+        }
     }
 }

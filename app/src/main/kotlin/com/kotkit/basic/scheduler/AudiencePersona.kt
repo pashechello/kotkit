@@ -13,6 +13,7 @@ import com.kotkit.basic.R
 enum class AudiencePersona(
     @StringRes val displayNameRes: Int,
     @StringRes val descriptionRes: Int,
+    @StringRes val emojiRes: Int,
     val peakHours: List<Int>  // Hours in 24h format when this audience is most active
 ) {
     /**
@@ -21,6 +22,7 @@ enum class AudiencePersona(
     STUDENT(
         displayNameRes = R.string.persona_student_name,
         descriptionRes = R.string.persona_student_desc,
+        emojiRes = R.string.persona_student_emoji,
         peakHours = listOf(7, 8, 12, 13, 18, 19, 22, 23)
     ),
 
@@ -30,6 +32,7 @@ enum class AudiencePersona(
     WORKER(
         displayNameRes = R.string.persona_worker_name,
         descriptionRes = R.string.persona_worker_desc,
+        emojiRes = R.string.persona_worker_emoji,
         peakHours = listOf(7, 8, 12, 13, 19, 20, 21)
     ),
 
@@ -39,6 +42,7 @@ enum class AudiencePersona(
     NIGHT_OWL(
         displayNameRes = R.string.persona_night_owl_name,
         descriptionRes = R.string.persona_night_owl_desc,
+        emojiRes = R.string.persona_night_owl_emoji,
         peakHours = listOf(11, 12, 15, 16, 21, 22, 23)
     ),
 
@@ -48,6 +52,7 @@ enum class AudiencePersona(
     PARENT(
         displayNameRes = R.string.persona_parent_name,
         descriptionRes = R.string.persona_parent_desc,
+        emojiRes = R.string.persona_parent_emoji,
         peakHours = listOf(9, 10, 13, 14, 21, 22)
     ),
 
@@ -57,6 +62,7 @@ enum class AudiencePersona(
     GENERAL(
         displayNameRes = R.string.persona_general_name,
         descriptionRes = R.string.persona_general_desc,
+        emojiRes = R.string.persona_general_emoji,
         peakHours = listOf(9, 12, 14, 18, 20)
     );
 

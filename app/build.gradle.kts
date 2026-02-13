@@ -5,6 +5,7 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("com.google.dagger.hilt.android")
     id("com.google.devtools.ksp")
+    id("com.google.gms.google-services")
 }
 
 // Load local.properties
@@ -42,8 +43,9 @@ android {
         }
 
         // Production API URL - all AI processing happens on backend
-        // Deployed on Fly.io: kotkit.pro (landing) + /api/v1/ (backend)
-        buildConfigField("String", "API_BASE_URL", "\"https://kotkit.pro/api/v1/\"")
+        // Deployed on Fly.io: kotkit-app.fly.dev (backend Python API)
+        // NOTE: endpoints в ApiService.kt уже содержат "api/v1/" prefix!
+        buildConfigField("String", "API_BASE_URL", "\"https://kotkit-app.fly.dev/\"")
     }
 
     buildTypes {
@@ -90,6 +92,10 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+}
+
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
 }
 
 dependencies {
@@ -144,6 +150,9 @@ dependencies {
     // Security
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
+    // AutoStarter - OEM-specific autostart permission helper (Xiaomi/Samsung/Huawei)
+    implementation("com.github.judemanutd:autostarter:1.1.0")
+
     // libadb-android for ADB wireless pairing and connection
     implementation("com.github.MuntashirAkon:libadb-android:3.1.1") {
         exclude(group = "org.bouncycastle")
@@ -168,10 +177,18 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer:1.2.1")
     implementation("androidx.media3:media3-ui:1.2.1")
 
+    // Firebase Cloud Messaging
+    implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
+    implementation("com.google.firebase:firebase-messaging-ktx")
+
     // Testing
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.mockito.kotlin:mockito-kotlin:5.2.1")
+    testImplementation("org.mockito:mockito-inline:5.2.0") // For mocking static methods
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
+    testImplementation("org.robolectric:robolectric:4.11.1") // Android framework testing
+    testImplementation("androidx.test:core:1.5.0") // AndroidX Test core
+    testImplementation("androidx.arch.core:core-testing:2.2.0") // LiveData/ViewModel testing
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
     androidTestImplementation(platform("androidx.compose:compose-bom:2024.02.00"))

@@ -12,7 +12,12 @@ import com.kotkit.basic.data.local.db.entities.PostStatus
 import com.kotkit.basic.data.local.db.entities.NetworkTaskStatus
 import com.kotkit.basic.data.remote.api.models.ErrorType
 import com.kotkit.basic.data.repository.NetworkTaskRepository
+import com.kotkit.basic.data.repository.WorkerRepository
+import com.kotkit.basic.scheduler.DeviceStateChecker
+import com.kotkit.basic.scheduler.PublishCheckResult
+import com.kotkit.basic.scheduler.PublishConditions
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.delay
 import java.io.ByteArrayOutputStream
 import java.io.File
 import javax.inject.Inject
@@ -29,7 +34,9 @@ class NetworkTaskExecutor @Inject constructor(
     private val networkTaskRepository: NetworkTaskRepository,
     private val videoDownloader: VideoDownloader,
     private val postingAgent: PostingAgent,
-    private val screenshotManager: ScreenshotManager
+    private val screenshotManager: ScreenshotManager,
+    private val deviceStateChecker: DeviceStateChecker,
+    private val workerRepository: WorkerRepository
 ) {
     companion object {
         private const val TAG = "NetworkTaskExecutor"
@@ -56,6 +63,13 @@ class NetworkTaskExecutor @Inject constructor(
     ): ExecutionResult {
         Log.i(TAG, "Starting execution of task ${task.id}")
 
+        // Duplicate video protection is handled server-side in task_scheduler.py
+        // (excludes workers who already posted a task with the same video_hash).
+        // Client-side Room DB may contain stale/zombie completions, so we don't check here.
+
+        // Track video path for cleanup on exception
+        var downloadedVideoPath: String? = null
+
         try {
             // ====================================================================
             // Stage 1: Get Video URL
@@ -73,8 +87,8 @@ class NetworkTaskExecutor @Inject constructor(
 
             val videoInfo = videoInfoResult.getOrThrow()
 
-            // Check URL expiry
-            if (System.currentTimeMillis() >= videoInfo.expiresAt) {
+            // Check URL expiry (expiresAt is in seconds, currentTimeMillis in milliseconds)
+            if (System.currentTimeMillis() / 1000 >= videoInfo.expiresAt) {
                 return handleError(
                     task = task,
                     errorType = ErrorType.NETWORK_TIMEOUT,
@@ -108,7 +122,18 @@ class NetworkTaskExecutor @Inject constructor(
             }
 
             val videoPath = downloadResult.getOrThrow()
+            downloadedVideoPath = videoPath  // Track for cleanup on exception
             networkTaskRepository.updateDownloadProgress(task.id, videoPath, 100)
+
+            // ====================================================================
+            // Stage 2.5: Wait for screen off (don't interrupt user)
+            // ====================================================================
+            onProgress(ExecutionStage.WAITING_SCREEN_OFF, 0)
+
+            if (!waitForScreenOff(maxWaitMinutes = 8)) {
+                Log.w(TAG, "Screen stayed on too long for task ${task.id}, will retry later")
+                return ExecutionResult.Retry(reason = "Screen stayed on for too long, posting deferred")
+            }
 
             // ====================================================================
             // Stage 3: Post to TikTok
@@ -120,7 +145,7 @@ class NetworkTaskExecutor @Inject constructor(
             val mockPost = PostEntity(
                 id = task.id.hashCode().toLong(),
                 videoPath = videoPath,
-                caption = task.caption,
+                caption = task.caption ?: "",
                 scheduledTime = System.currentTimeMillis(),
                 status = PostStatus.POSTING
             )
@@ -186,6 +211,13 @@ class NetworkTaskExecutor @Inject constructor(
             if (completeResult.isFailure) {
                 Log.w(TAG, "Failed to sync completion (will retry later): ${completeResult.exceptionOrNull()?.message}")
                 // Task is marked locally as completed with pending sync
+            } else {
+                // Sync earnings from server so foreground notification shows correct amount
+                try {
+                    workerRepository.fetchEarnings()
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to sync earnings after completion: ${e.message}")
+                }
             }
 
             // ====================================================================
@@ -208,7 +240,9 @@ class NetworkTaskExecutor @Inject constructor(
                 task = task,
                 errorType = ErrorType.UNKNOWN_ERROR,
                 message = "Unexpected error: ${e.message}",
-                captureScreenshot = true
+                captureScreenshot = true,
+                cleanup = downloadedVideoPath != null,
+                videoPath = downloadedVideoPath
             )
         }
     }
@@ -260,6 +294,36 @@ class NetworkTaskExecutor @Inject constructor(
         }
     }
 
+    /**
+     * Wait for the screen to turn off before posting.
+     * Polls every 5 seconds, gives up after maxWaitMinutes.
+     */
+    private suspend fun waitForScreenOff(maxWaitMinutes: Int = 30): Boolean {
+        val conditions = PublishConditions(requireScreenOff = true)
+        if (deviceStateChecker.canPublish(conditions) is PublishCheckResult.Ready) {
+            Log.i(TAG, "Screen already off, proceeding to post")
+            return true
+        }
+
+        Log.i(TAG, "Screen is on, waiting up to ${maxWaitMinutes}min for screen off...")
+
+        val maxWaitMs = maxWaitMinutes * 60_000L
+        val pollIntervalMs = 5_000L
+        val startTime = System.currentTimeMillis()
+
+        while (System.currentTimeMillis() - startTime < maxWaitMs) {
+            delay(pollIntervalMs)
+            if (deviceStateChecker.canPublish(conditions) is PublishCheckResult.Ready) {
+                val elapsed = (System.currentTimeMillis() - startTime) / 1000
+                Log.i(TAG, "Screen turned off after ${elapsed}s, proceeding to post")
+                return true
+            }
+        }
+
+        Log.w(TAG, "Screen stayed on for ${maxWaitMinutes}min, giving up")
+        return false
+    }
+
     private fun encodeScreenshot(path: String): String? {
         return try {
             val file = File(path)
@@ -286,6 +350,7 @@ class NetworkTaskExecutor @Inject constructor(
 enum class ExecutionStage {
     GETTING_URL,
     DOWNLOADING,
+    WAITING_SCREEN_OFF,
     POSTING,
     VERIFYING,
     COMPLETING,

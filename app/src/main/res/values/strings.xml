@@ -18,6 +18,17 @@
     <string name="notification_channel_alerts">Post Alerts</string>
     <string name="notification_channel_scheduled">Scheduled Posts</string>
 
+    <!-- Worker Mode Notifications -->
+    <string name="worker_notif_executing">🚀 Executing task…</string>
+    <string name="worker_notif_limit_reached">✅ Daily limit reached (%1$d/%2$d)</string>
+    <string name="worker_notif_active">🤖 KotKit Worker Active</string>
+    <string name="worker_notif_posting">Posting to TikTok…</string>
+    <string name="worker_notif_progress">Today: %1$d/%2$d tasks • Earned: %3$.2f ₽</string>
+    <string name="worker_notif_waiting">Waiting for tasks • Next check: %1$ds</string>
+    <string name="worker_notif_big_text">Status: %1$s\nProgress: %2$d/%3$d tasks today\nEarned: %4$.2f ₽\n\nKotKit is earning money for you in background.\nYou can safely close the app.</string>
+    <string name="worker_status_working">Working</string>
+    <string name="worker_status_waiting">Waiting</string>
+
     <!-- Actions -->
     <string name="action_new_post">New Post</string>
     <string name="action_schedule">Schedule</string>
@@ -51,6 +62,7 @@
     <string name="settings_language_subtitle">Select app language</string>
     <string name="language_russian">Русский</string>
     <string name="language_english">English</string>
+    <string name="settings_target_audience">Target Audience</string>
     <string name="settings_accessibility">Accessibility</string>
     <string name="settings_screen_unlock">Screen Unlock</string>
     <string name="settings_account">Account</string>
@@ -64,6 +76,17 @@
     <string name="settings_version">Version</string>
     <string name="settings_privacy_policy">Privacy Policy</string>
     <string name="dialog_ok">OK</string>
+
+    <!-- TikTok Username -->
+    <string name="settings_tiktok">TikTok</string>
+    <string name="settings_tiktok_username">TikTok Username</string>
+    <string name="settings_tiktok_not_set">Not set</string>
+    <string name="tiktok_username_dialog_title">Enter TikTok Username</string>
+    <string name="tiktok_username_dialog_subtitle">Required for Worker Mode. We\'ll verify your posts on this profile.</string>
+    <string name="tiktok_username_hint">username</string>
+    <string name="tiktok_username_invalid">Invalid username (letters, numbers, dots, underscores only)</string>
+    <string name="tiktok_username_save">Save</string>
+    <string name="tiktok_username_cancel">Cancel</string>
 
     <!-- Home Screen -->
     <string name="home_upcoming_posts">Upcoming Posts</string>
@@ -96,9 +119,7 @@
     <string name="settings_accessibility_service">Accessibility Service</string>
     <string name="settings_accessibility_enabled">Enabled - Ready to automate TikTok</string>
     <string name="settings_accessibility_not_enabled">Not enabled - Required for automation</string>
-    <string name="settings_overlay_permission">Floating Indicator</string>
-    <string name="settings_overlay_enabled">Enabled - Status icon will appear</string>
-    <string name="settings_overlay_not_enabled">Not enabled - For emergency stop</string>
+    <string name="settings_checking">Checking…</string>
     <string name="settings_notification_permission">Notifications</string>
     <string name="settings_notification_enabled">Enabled - You will see posting status</string>
     <string name="settings_notification_not_enabled">Not enabled - Required to see progress</string>
@@ -106,6 +127,22 @@
     <string name="settings_pin_saved">PIN saved</string>
     <string name="settings_password_saved">Password saved</string>
     <string name="settings_not_configured">Not configured - Required for scheduled posts</string>
+    <string name="settings_worker_reliability">For stable operation</string>
+    <string name="settings_battery_optimization">Battery Optimization</string>
+    <string name="settings_battery_disabled">Disabled - Worker mode runs reliably</string>
+    <string name="settings_battery_enabled">Enabled - May stop background tasks</string>
+    <string name="settings_oem_autostart">%1$s Permissions</string>
+    <string name="settings_oem_autostart_subtitle">Required for %1$s devices to post from background</string>
+    <string name="settings_oem_autostart_enabled">Enabled - Background posting works</string>
+    <string name="autostart_confirm_title">Permissions Enabled?</string>
+    <string name="autostart_confirm_message">Did you enable ALL permissions for KotKit?\n\n• Autostart\n• Show on lock screen\n• Pop-up windows</string>
+    <string name="autostart_confirm_yes">Yes, all enabled</string>
+    <string name="autostart_confirm_no">Not yet</string>
+    <string name="autostart_manual_title">Enable Manually</string>
+    <string name="autostart_manual_message">Could not open settings automatically.\n\nPlease enable permissions manually:\n\n%1$s</string>
+    <string name="autostart_manual_open_settings">Open App Settings</string>
+    <string name="autostart_manual_done">Done</string>
+    <string name="fix">Fix</string>
 
     <!-- Caption Preferences Screen -->
     <string name="caption_prefs_title">Caption Style</string>
@@ -128,6 +165,7 @@
 
     <!-- Queue Screen -->
     <string name="queue_no_scheduled">No scheduled posts</string>
+    <string name="queue_count_scheduled">%d scheduled</string>
 
     <!-- History Screen -->
     <string name="history_title">History</string>
@@ -158,16 +196,24 @@
     <string name="post_tomorrow">Tomorrow, %s</string>
 
     <!-- Audience Personas -->
+    <string name="persona_dialog_title">Target Audience</string>
+    <string name="persona_dialog_explanation">Choose who you\'re creating content for. We\'ll schedule your posts at times when this audience is most active on TikTok.</string>
+    <string name="persona_peak_hours">Peak hours:</string>
     <string name="persona_student_name">Students</string>
     <string name="persona_student_desc">Before classes, lunch, evening, late night</string>
-    <string name="persona_worker_name">Office</string>
+    <string name="persona_student_emoji">📚</string>
+    <string name="persona_worker_name">Office Workers</string>
     <string name="persona_worker_desc">Morning commute, lunch break, after work</string>
+    <string name="persona_worker_emoji">💼</string>
     <string name="persona_night_owl_name">Night Owls</string>
     <string name="persona_night_owl_desc">Late riser, afternoon, evening peak</string>
+    <string name="persona_night_owl_emoji">🦉</string>
     <string name="persona_parent_name">Parents</string>
     <string name="persona_parent_desc">After morning routine, nap time, evening</string>
+    <string name="persona_parent_emoji">👨‍👩‍👧</string>
     <string name="persona_general_name">General</string>
     <string name="persona_general_desc">Standard peak hours for most people</string>
+    <string name="persona_general_emoji">🌐</string>
 
     <!-- Batch Schedule Screen -->
     <string name="batch_schedule_title">Batch Schedule</string>
@@ -196,9 +242,22 @@
     <string name="batch_schedule_settings">Schedule</string>
     <string name="batch_schedule_per_day">Videos per day</string>
     <string name="batch_schedule_videos_count">%d videos</string>
-    <string name="batch_schedule_audience">Target Audience</string>
+    <string name="batch_schedule_audience">Posting Time</string>
+    <plurals name="batch_schedule_duration_days">
+        <item quantity="one">Will take %d day</item>
+        <item quantity="other">Will take %d days</item>
+    </plurals>
+    <!-- Schedule quality warnings -->
+    <string name="schedule_quality_good">Using extended hours (%1$s interval)</string>
+    <string name="schedule_quality_compressed">Compressed schedule (%1$s interval)</string>
+    <string name="schedule_quality_tight">Very tight schedule - consider fewer videos</string>
+    <string name="batch_schedule_generate">Generate Schedule</string>
+    <string name="batch_schedule_regenerate">Regenerate Schedule</string>
     <string name="batch_schedule_ai_captions">AI Captions</string>
     <string name="batch_schedule_ai_description">Generate engaging captions for all videos using AI</string>
+    <string name="batch_prompt_placeholder">Describe your videos or style…</string>
+    <string name="caption_language_label">Caption language</string>
+    <string name="error_auth_required_for_ai">Please log in to use AI captions</string>
     <string name="batch_schedule_generate_all">Generate for %d videos</string>
     <string name="batch_schedule_generating_progress">Generating… %d%%</string>
     <string name="batch_schedule_post_preview">Post Preview</string>
@@ -223,10 +282,35 @@
     <string name="worker_screen_title">Start Earning</string>
     <string name="worker_button_money">MONEY</string>
     <string name="worker_coming_soon">Coming soon</string>
+    <string name="worker_mode_active">You are now earning money!</string>
+    <string name="worker_mode_inactive">Tap to start earning</string>
+    <string name="worker_stop_confirm_title">Stop earning?</string>
+    <string name="worker_stop_confirm_message">Are you sure you want to go offline? You won\'t receive new tasks.</string>
+    <string name="worker_stop_confirm_yes">Stop</string>
+    <string name="worker_stop_confirm_no">Cancel</string>
     <string name="worker_your_income">Your Income</string>
-    <string name="worker_available_to_withdraw">$%.2f available to withdraw</string>
+    <string name="worker_available_to_withdraw">%.2f ₽ available to withdraw</string>
     <string name="worker_stats_title">Your Stats</string>
     <string name="worker_stats_completed">Completed</string>
     <string name="worker_stats_success_rate">Success</string>
     <string name="worker_stats_rating">Rating</string>
+
+    <!-- Auth Required -->
+    <string name="auth_required_title">Log In Required</string>
+    <string name="auth_required_general">Log in to access all app features</string>
+    <string name="auth_required_schedule">Log in to schedule posts</string>
+    <string name="auth_required_ai">Log in to use AI captions</string>
+    <string name="auth_required_worker">Log in to access earning features</string>
+    <string name="auth_login_via_website">Log In via Website</string>
+    <string name="auth_later">Later</string>
+    <string name="auth_session_expired">Session expired. Please log in again.</string>
+    <string name="auth_login_success">Logged in successfully!</string>
+    <string name="error_auth_required_for_schedule">Please log in to schedule posts</string>
+    <string name="error_select_video">Please select a video</string>
+    <string name="error_select_future_time">Please select a future time</string>
+    <string name="error_select_videos_first">Please select videos first</string>
+    <string name="error_schedule_not_generated">Schedule preview not generated</string>
+    <string name="error_slots_in_past">%d slots are scheduled in the past. Please update the schedule.</string>
+    <string name="error_failed_create_post">Failed to create post</string>
+    <string name="error_failed_schedule_videos">Failed to schedule videos</string>
 </resources>

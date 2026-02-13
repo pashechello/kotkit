@@ -87,8 +87,8 @@ fun StatusBadge(
         modifier = modifier
             .scale(pulseScale)
             .shadow(
-                elevation = 4.dp,
-                shape = RoundedCornerShape(20.dp),
+                elevation = 2.dp,
+                shape = RoundedCornerShape(16.dp),
                 ambientColor = when (status) {
                     PostStatus.COMPLETED -> StatusCompleted.copy(alpha = 0.3f)
                     PostStatus.FAILED -> StatusFailed.copy(alpha = 0.3f)
@@ -102,28 +102,30 @@ fun StatusBadge(
                     else -> Color.Transparent
                 }
             )
-            .clip(RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(16.dp))
             .background(gradient)
-            .padding(horizontal = 10.dp, vertical = 6.dp),
+            .padding(horizontal = 8.dp, vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Icon(
             imageVector = icon,
             contentDescription = null,
             tint = Color.White,
-            modifier = Modifier.size(14.dp)
+            modifier = Modifier.size(12.dp)
         )
         Text(
             text = stringResource(textResId),
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.SemiBold,
-            color = Color.White
+            color = Color.White,
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
         )
         if (showPulse) {
             Box(
                 modifier = Modifier
-                    .size(6.dp)
+                    .size(5.dp)
                     .clip(CircleShape)
                     .background(Color.White)
             )

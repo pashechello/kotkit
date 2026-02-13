@@ -15,6 +15,7 @@ class EncryptedPreferences(context: Context) {
         private const val KEY_AUTH_TOKEN = "auth_token"
         private const val KEY_REFRESH_TOKEN = "refresh_token"
         private const val KEY_USER_ID = "user_id"
+        private const val KEY_USER_EMAIL = "user_email"
         private const val KEY_ONBOARDING_COMPLETE = "onboarding_complete"
         private const val KEY_ACCESSIBILITY_ENABLED = "accessibility_enabled"
         private const val KEY_SERVER_URL = "server_url"
@@ -55,6 +56,10 @@ class EncryptedPreferences(context: Context) {
     var userId: String?
         get() = prefs.getString(KEY_USER_ID, null)
         set(value) = prefs.edit().putString(KEY_USER_ID, value).apply()
+
+    var userEmail: String?
+        get() = prefs.getString(KEY_USER_EMAIL, null)
+        set(value) = prefs.edit().putString(KEY_USER_EMAIL, value).apply()
 
     // Onboarding
     var isOnboardingComplete: Boolean
@@ -109,6 +114,7 @@ class EncryptedPreferences(context: Context) {
             .remove(KEY_AUTH_TOKEN)
             .remove(KEY_REFRESH_TOKEN)
             .remove(KEY_USER_ID)
+            .remove(KEY_USER_EMAIL)
             .apply()
     }
 

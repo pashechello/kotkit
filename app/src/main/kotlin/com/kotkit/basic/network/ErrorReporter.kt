@@ -8,6 +8,7 @@ import android.util.Base64
 import android.util.Log
 import com.kotkit.basic.BuildConfig
 import com.kotkit.basic.data.remote.api.ApiService
+import com.kotkit.basic.data.remote.api.CorrelationIdInterceptor
 import com.kotkit.basic.data.remote.api.models.ErrorLogRequest
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
@@ -26,13 +27,12 @@ import javax.inject.Singleton
  * - Automatic device info collection
  * - Optional screenshot capture
  * - Fire-and-forget async reporting
- * - Feature flag controlled
+ * - Always enabled (no feature flag)
  */
 @Singleton
 class ErrorReporter @Inject constructor(
     @ApplicationContext private val context: Context,
     private val apiService: ApiService,
-    private val remoteConfigManager: RemoteConfigManager,
     private val screenshotManager: ScreenshotManager
 ) {
     companion object {
@@ -55,12 +55,6 @@ class ErrorReporter @Inject constructor(
         context: Map<String, String>? = null,
         includeScreenshot: Boolean = false
     ) {
-        // Check if error reporting is enabled
-        if (!remoteConfigManager.isErrorReportingEnabled()) {
-            Log.d(TAG, "Error reporting disabled, skipping")
-            return
-        }
-
         reportScope.launch {
             try {
                 reportInternal(
@@ -106,11 +100,6 @@ class ErrorReporter @Inject constructor(
         throwable: Throwable? = null,
         context: Map<String, String>? = null
     ) {
-        if (!remoteConfigManager.isErrorReportingEnabled()) {
-            Log.d(TAG, "Error reporting disabled, skipping")
-            return
-        }
-
         try {
             reportInternal(
                 errorType = errorType,
@@ -141,8 +130,9 @@ class ErrorReporter @Inject constructor(
 
         val stackTrace = throwable?.stackTraceToString()?.take(MAX_STACK_TRACE_LENGTH)
 
-        // Merge context with additional context
+        // Merge context with additional context and add correlation ID
         val fullContext = mutableMapOf<String, Any>()
+        fullContext["correlation_id"] = CorrelationIdInterceptor.getSessionCorrelationId()
         additionalContext?.forEach { (k, v) -> fullContext[k] = v }
 
         val request = ErrorLogRequest(

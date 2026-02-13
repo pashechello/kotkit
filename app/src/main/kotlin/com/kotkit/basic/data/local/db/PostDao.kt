@@ -55,4 +55,11 @@ interface PostDao {
 
     @Query("SELECT COUNT(*) FROM posts")
     fun countAllFlow(): Flow<Int>
+
+    /**
+     * Recover posts stuck in POSTING status after app crash.
+     * Posts that have been POSTING since before [cutoffTime] are marked as FAILED.
+     */
+    @Query("UPDATE posts SET status = 'FAILED', errorMessage = 'Приложение было закрыто во время публикации', updatedAt = :now WHERE status = 'POSTING' AND updatedAt < :cutoffTime")
+    suspend fun recoverStuckPostingPosts(cutoffTime: Long, now: Long = System.currentTimeMillis())
 }

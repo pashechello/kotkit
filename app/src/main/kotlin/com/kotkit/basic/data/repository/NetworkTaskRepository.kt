@@ -7,9 +7,12 @@ import com.kotkit.basic.data.local.db.entities.NetworkTaskStatus
 import com.kotkit.basic.data.local.db.entities.SyncStatus
 import com.kotkit.basic.data.remote.api.ApiService
 import com.kotkit.basic.data.remote.api.models.CompleteTaskRequest
+import com.kotkit.basic.data.remote.api.models.CompletedTasksResponse
 import com.kotkit.basic.data.remote.api.models.FailTaskRequest
 import com.kotkit.basic.data.remote.api.models.TaskProgressRequest
 import com.kotkit.basic.data.remote.api.models.TaskResponse
+import com.kotkit.basic.data.remote.api.models.UrlSubmissionRequest
+import com.kotkit.basic.data.remote.api.models.UrlSubmissionResponse
 import kotlinx.coroutines.flow.Flow
 import java.io.File
 import javax.inject.Inject
@@ -50,6 +53,9 @@ class NetworkTaskRepository @Inject constructor(
     suspend fun getNextScheduledTask(): NetworkTaskEntity? =
         networkTaskDao.getNextScheduledTask(System.currentTimeMillis())
 
+    suspend fun getLastCompletedAt(): Long? =
+        networkTaskDao.getLastCompletedAt()
+
     suspend fun getPendingSyncTasks(): List<NetworkTaskEntity> =
         networkTaskDao.getPendingSyncTasks()
 
@@ -74,7 +80,7 @@ class NetworkTaskRepository @Inject constructor(
     }
 
     // ========================================================================
-    // API + Local: Claim Task
+    // API + Local: Claim Task (legacy pull-based)
     // ========================================================================
 
     suspend fun claimTask(taskId: String): Result<NetworkTaskEntity> {
@@ -86,6 +92,44 @@ class NetworkTaskRepository @Inject constructor(
             Result.success(entity)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to claim task $taskId", e)
+            Result.failure(e)
+        }
+    }
+
+    // ========================================================================
+    // API + Local: Accept Reserved Task (push-based)
+    // ========================================================================
+
+    /**
+     * Accept a task that was reserved for this worker by the backend.
+     * This is part of the push-based queue system.
+     *
+     * @param taskId Task ID from FCM notification
+     * @return Result with the accepted task entity
+     */
+    suspend fun acceptTask(taskId: String): Result<NetworkTaskEntity> {
+        return try {
+            val response = apiService.acceptTask(taskId)
+            val entity = response.toEntity()
+            networkTaskDao.insert(entity)
+            Log.i(TAG, "Accepted reserved task $taskId, scheduled for ${entity.scheduledFor}")
+            Result.success(entity)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to accept task $taskId", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Get tasks reserved for this worker (for crash recovery on startup).
+     */
+    suspend fun getReservedTasks(): Result<List<TaskResponse>> {
+        return try {
+            val response = apiService.getReservedTasks()
+            Log.i(TAG, "Got ${response.tasks.size} reserved tasks")
+            Result.success(response.tasks)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to get reserved tasks", e)
             Result.failure(e)
         }
     }
@@ -292,6 +336,23 @@ class NetworkTaskRepository @Inject constructor(
     }
 
     // ========================================================================
+    // Stale Task Cleanup
+    // ========================================================================
+
+    /**
+     * Remove a task that server no longer recognizes (400/403/404 on heartbeat).
+     * Cancels any pending WorkManager jobs and deletes from local DB.
+     */
+    suspend fun removeStaleTask(taskId: String) {
+        try {
+            networkTaskDao.deleteById(taskId)
+            Log.i(TAG, "Removed stale task $taskId from local DB")
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to remove stale task $taskId", e)
+        }
+    }
+
+    // ========================================================================
     // Cleanup
     // ========================================================================
 
@@ -339,20 +400,62 @@ class NetworkTaskRepository @Inject constructor(
             videoSizeBytes = videoSizeBytes,
             caption = caption,
             status = status,
-            priceUsd = priceUsd,
-            assignedAt = assignedAt,
-            scheduledFor = scheduledFor,
+            priceRub = priceRub,
+            assignedAt = assignedAt?.toMillisIfSeconds(),
+            scheduledFor = scheduledFor?.toMillisIfSeconds(),
             lastHeartbeat = lastHeartbeat,
-            startedAt = startedAt,
-            completedAt = completedAt,
+            startedAt = startedAt?.toMillisIfSeconds(),
+            completedAt = completedAt?.toMillisIfSeconds(),
             tiktokVideoId = tiktokVideoId,
             tiktokPostUrl = tiktokPostUrl,
             errorMessage = errorMessage,
             errorType = errorType,
             retryCount = retryCount,
+            videoThumbnailUrl = videoThumbnailUrl,
             syncStatus = SyncStatus.SYNCED
         )
     }
+
+    // ========================================================================
+    // Verification URL Submission
+    // ========================================================================
+
+    suspend fun getCompletedTasksWithVerification(
+        limit: Int = 20,
+        offset: Int = 0
+    ): Result<CompletedTasksResponse> {
+        return try {
+            val response = apiService.getCompletedTasksWithVerification(limit, offset)
+            Result.success(response)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to fetch completed tasks with verification", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun submitVerificationUrl(
+        verificationId: String,
+        tiktokVideoUrl: String
+    ): Result<UrlSubmissionResponse> {
+        return try {
+            val response = apiService.submitVerificationUrl(
+                verificationId,
+                UrlSubmissionRequest(tiktokVideoUrl)
+            )
+            Result.success(response)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to submit verification URL", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Convert UNIX timestamp from seconds to milliseconds if needed.
+     * Server sends timestamps in seconds; Android/Room uses milliseconds.
+     * Timestamps in seconds are < 10B until year ~2286.
+     */
+    private fun Long.toMillisIfSeconds(): Long =
+        if (this < 10_000_000_000L) this * 1000 else this
 }
 
 data class VideoDownloadInfo(

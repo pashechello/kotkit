@@ -38,7 +38,7 @@ object DatabaseModule {
                     videoSizeBytes INTEGER,
                     caption TEXT NOT NULL,
                     status TEXT NOT NULL,
-                    priceUsd REAL NOT NULL,
+                    priceRub REAL NOT NULL,
                     assignedAt INTEGER,
                     scheduledFor INTEGER,
                     lastHeartbeat INTEGER,
@@ -77,9 +77,9 @@ object DatabaseModule {
                     completedTasks INTEGER NOT NULL DEFAULT 0,
                     failedTasks INTEGER NOT NULL DEFAULT 0,
                     successRate REAL NOT NULL DEFAULT 0,
-                    totalEarnedUsd REAL NOT NULL DEFAULT 0,
-                    pendingBalanceUsd REAL NOT NULL DEFAULT 0,
-                    availableBalanceUsd REAL NOT NULL DEFAULT 0,
+                    totalEarnedRub REAL NOT NULL DEFAULT 0,
+                    pendingBalanceRub REAL NOT NULL DEFAULT 0,
+                    availableBalanceRub REAL NOT NULL DEFAULT 0,
                     minPricePerPost REAL NOT NULL DEFAULT 0,
                     lastActiveAt INTEGER,
                     createdAt INTEGER NOT NULL,
@@ -95,7 +95,7 @@ object DatabaseModule {
                     workerId TEXT NOT NULL,
                     taskId TEXT NOT NULL,
                     campaignId TEXT NOT NULL,
-                    amountUsd REAL NOT NULL,
+                    amountRub REAL NOT NULL,
                     status TEXT NOT NULL,
                     earnedAt INTEGER NOT NULL,
                     confirmedAt INTEGER,
@@ -134,17 +134,43 @@ object DatabaseModule {
         }
     }
 
+    /**
+     * Migration from version 6 to 7
+     * Adds videoThumbnailUrl column to network_tasks table
+     */
+    private val MIGRATION_6_7 = object : Migration(6, 7) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            database.execSQL("ALTER TABLE network_tasks ADD COLUMN videoThumbnailUrl TEXT DEFAULT NULL")
+        }
+    }
+
+    private const val DB_NAME = "autoposter_db"
+
     @Provides
     @Singleton
     fun provideAppDatabase(
         @ApplicationContext context: Context
     ): AppDatabase {
+        return try {
+            buildDatabase(context).also { db ->
+                // Force Room to open the DB and verify schema now
+                db.openHelper.writableDatabase
+            }
+        } catch (e: IllegalStateException) {
+            // Schema hash mismatch (entity changed without version bump).
+            // Delete the old DB and recreate to avoid crash loop.
+            context.deleteDatabase(DB_NAME)
+            buildDatabase(context)
+        }
+    }
+
+    private fun buildDatabase(context: Context): AppDatabase {
         return Room.databaseBuilder(
             context,
             AppDatabase::class.java,
-            "autoposter_db"
+            DB_NAME
         )
-            .addMigrations(MIGRATION_1_2, MIGRATION_3_4)
+            .addMigrations(MIGRATION_1_2, MIGRATION_3_4, MIGRATION_6_7)
             .fallbackToDestructiveMigration()
             .build()
     }

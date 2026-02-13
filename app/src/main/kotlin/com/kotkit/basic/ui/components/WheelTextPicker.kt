@@ -23,7 +23,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -31,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import com.commandiron.wheel_picker_compose.core.SelectorProperties
 import com.commandiron.wheel_picker_compose.core.WheelPickerDefaults
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 
 /**
  * Custom WheelTextPicker implementation since the library version doesn't export it.
@@ -49,6 +52,7 @@ fun WheelTextPicker(
     onScrollFinished: (index: Int) -> Unit = {}
 ) {
     val density = LocalDensity.current
+    val hapticFeedback = LocalHapticFeedback.current
     val itemHeight = 40.dp
     val itemHeightPx = with(density) { itemHeight.toPx() }
 
@@ -70,6 +74,19 @@ fun WheelTextPicker(
                 firstVisibleIndex
             }.coerceIn(0, (texts.size - 1).coerceAtLeast(0))
         }
+    }
+
+    // Haptic feedback when center item changes (casino-style click)
+    // Using snapshotFlow with drop(1) to skip initial composition
+    LaunchedEffect(Unit) {
+        snapshotFlow { centerIndex }
+            .distinctUntilChanged()
+            .drop(1) // Skip initial value to avoid haptic on screen load
+            .collect {
+                if (texts.isNotEmpty()) {
+                    hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                }
+            }
     }
 
     // Notify on scroll finished

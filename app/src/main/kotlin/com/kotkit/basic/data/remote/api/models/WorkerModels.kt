@@ -121,3 +121,16 @@ data class ContentCategoryResponse(
     @SerializedName("is_allowed") val isAllowed: Boolean,
     @SerializedName("requires_verification") val requiresVerification: Boolean
 )
+
+// ============================================================================
+// Worker Heartbeat (Worker-level, not Task-level)
+// ============================================================================
+
+data class WorkerHeartbeatResponse(
+    val ok: Boolean,
+    @SerializedName("last_active_at") val lastActiveAt: Long
+)
+
+data class WorkerOfflineResponse(
+    val ok: Boolean
+)

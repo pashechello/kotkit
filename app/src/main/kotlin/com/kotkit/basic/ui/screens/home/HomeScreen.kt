@@ -40,6 +40,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.airbnb.lottie.compose.*
 import com.kotkit.basic.R
+import com.kotkit.basic.data.local.db.entities.PostEntity
+import com.kotkit.basic.data.local.db.entities.PostStatus
 import com.kotkit.basic.ui.components.*
 import com.kotkit.basic.ui.theme.*
 
@@ -54,6 +56,7 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val cancellingPostId by viewModel.cancellingPostId.collectAsState()
     val lifecycleOwner = LocalLifecycleOwner.current
 
     DisposableEffect(lifecycleOwner) {
@@ -142,8 +145,13 @@ fun HomeScreen(
                             scheduledCount = uiState.scheduledCount,
                             failedCount = uiState.failedCount,
                             completedCount = uiState.completedCount,
+                            postingPost = uiState.scheduledPosts.firstOrNull {
+                                it.status == PostStatus.POSTING
+                            },
+                            cancellingPostId = cancellingPostId,
                             onQueueClick = onNavigateToQueue,
                             onHistoryClick = onNavigateToHistory,
+                            onStopPosting = { postId -> viewModel.stopPosting(postId) },
                             modifier = Modifier.padding(horizontal = 16.dp)
                         )
                     }
@@ -176,6 +184,7 @@ fun HomeScreen(
                                     onClick = {},
                                     onDelete = { viewModel.deletePost(post.id) },
                                     onReschedule = {},
+                                    onStop = { viewModel.stopPosting(post.id) },
                                     modifier = Modifier.padding(horizontal = 16.dp)
                                 )
                             }
@@ -210,6 +219,7 @@ fun HomeScreen(
                                     onClick = {},
                                     onDelete = { viewModel.deletePost(post.id) },
                                     onReschedule = {},
+                                    onStop = { viewModel.stopPosting(post.id) },
                                     modifier = Modifier.padding(horizontal = 16.dp)
                                 )
                             }
@@ -243,7 +253,10 @@ fun HomeScreen(
                 .padding(16.dp)
                 .navigationBarsPadding()
         ) {
-            GradientFAB(onClick = onNavigateToNewPost)
+            GradientFAB(
+                onClick = onNavigateToNewPost,
+                contentDescription = stringResource(R.string.action_new_post)
+            )
         }
     }
 }
@@ -389,135 +402,6 @@ private fun GlassTopBar(onNavigateToSettings: () -> Unit) {
     }
 }
 
-@Composable
-private fun GradientFAB(onClick: () -> Unit) {
-    var isPressed by remember { mutableStateOf(false) }
-
-    // Press animation
-    val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.85f else 1f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium
-        ),
-        label = "fab_scale"
-    )
-
-    // Pulsing glow animation
-    val infiniteTransition = rememberInfiniteTransition(label = "fab_glow")
-    val glowScale by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = 1.15f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1500, easing = EaseInOutSine),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "glow_scale"
-    )
-    val glowAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.6f,
-        targetValue = 0.3f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1500, easing = EaseInOutSine),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "glow_alpha"
-    )
-
-    // Rotating gradient angle
-    val rotationAngle by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(8000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "rotation"
-    )
-
-    Box(
-        modifier = Modifier.size(72.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        // Outer pulsing glow
-        Box(
-            modifier = Modifier
-                .size(72.dp)
-                .scale(glowScale)
-                .blur(20.dp)
-                .background(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            BrandPink.copy(alpha = glowAlpha),
-                            BrandCyan.copy(alpha = glowAlpha * 0.5f),
-                            Color.Transparent
-                        )
-                    ),
-                    shape = CircleShape
-                )
-        )
-
-        // Main FAB button
-        Box(
-            modifier = Modifier
-                .size(64.dp)
-                .scale(scale)
-                .shadow(
-                    elevation = 12.dp,
-                    shape = CircleShape,
-                    ambientColor = BrandPink.copy(alpha = 0.5f),
-                    spotColor = BrandCyan.copy(alpha = 0.5f)
-                )
-                .clip(CircleShape)
-                .background(
-                    brush = Brush.linearGradient(
-                        colors = listOf(BrandCyan, BrandPink),
-                        start = androidx.compose.ui.geometry.Offset(
-                            x = kotlin.math.cos(Math.toRadians(rotationAngle.toDouble())).toFloat() * 100,
-                            y = kotlin.math.sin(Math.toRadians(rotationAngle.toDouble())).toFloat() * 100
-                        ),
-                        end = androidx.compose.ui.geometry.Offset(
-                            x = kotlin.math.cos(Math.toRadians((rotationAngle + 180).toDouble())).toFloat() * 100,
-                            y = kotlin.math.sin(Math.toRadians((rotationAngle + 180).toDouble())).toFloat() * 100
-                        )
-                    )
-                )
-                .border(
-                    width = 2.dp,
-                    brush = Brush.linearGradient(
-                        colors = listOf(
-                            Color.White.copy(alpha = 0.4f),
-                            Color.White.copy(alpha = 0.1f)
-                        )
-                    ),
-                    shape = CircleShape
-                )
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = {
-                        isPressed = true
-                        onClick()
-                    }
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Default.Add,
-                contentDescription = stringResource(R.string.action_new_post),
-                tint = Color.White,
-                modifier = Modifier.size(28.dp)
-            )
-        }
-    }
-
-    LaunchedEffect(isPressed) {
-        if (isPressed) {
-            kotlinx.coroutines.delay(150)
-            isPressed = false
-        }
-    }
-}
 
 @Composable
 private fun StatusSection(
@@ -644,14 +528,32 @@ private fun StatsSection(
     scheduledCount: Int,
     failedCount: Int,
     completedCount: Int,
+    postingPost: PostEntity?,
+    cancellingPostId: Long?,
     onQueueClick: () -> Unit,
     onHistoryClick: () -> Unit,
+    onStopPosting: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        // Publishing Now card - shows only when posting or cancelling
+        AnimatedVisibility(
+            visible = postingPost != null || cancellingPostId != null,
+            enter = expandVertically() + fadeIn(),
+            exit = shrinkVertically() + fadeOut()
+        ) {
+            postingPost?.let { post ->
+                PublishingNowCard(
+                    postCaption = post.caption.ifBlank { "Публикация" }.take(50),
+                    isCancelling = cancellingPostId == post.id,
+                    onStop = { onStopPosting(post.id) }
+                )
+            }
+        }
+
         // Main stats row - Scheduled and Completed
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -687,6 +589,111 @@ private fun StatsSection(
                 failedCount = failedCount,
                 onClick = onHistoryClick
             )
+        }
+    }
+}
+
+@Composable
+private fun PublishingNowCard(
+    postCaption: String,
+    isCancelling: Boolean,
+    onStop: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "publishing_pulse")
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.6f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(800, easing = EaseInOutSine),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse_alpha"
+    )
+
+    // Choose colors based on cancelling state
+    val accentColor = if (isCancelling) StatusCancelled else StatusPosting
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(accentColor.copy(alpha = 0.15f))
+            .border(
+                width = 1.dp,
+                color = accentColor.copy(alpha = pulseAlpha * 0.5f),
+                shape = RoundedCornerShape(16.dp)
+            )
+            .padding(horizontal = 16.dp, vertical = 14.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
+                // Pulsing indicator
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(accentColor.copy(alpha = 0.2f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(22.dp),
+                        color = accentColor,
+                        strokeWidth = 2.dp
+                    )
+                }
+                Column {
+                    Text(
+                        text = if (isCancelling) "Отменяется... ⏳" else "Публикуется сейчас 🚀",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = accentColor
+                    )
+                    Text(
+                        text = postCaption,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextTertiary,
+                        maxLines = 1
+                    )
+                }
+            }
+
+            // Stop button - hide when already cancelling
+            if (!isCancelling) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(StatusFailed.copy(alpha = 0.15f))
+                        .clickable(onClick = onStop)
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Stop,
+                            contentDescription = null,
+                            tint = StatusFailed,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = "Стоп",
+                            color = StatusFailed,
+                            fontWeight = FontWeight.SemiBold,
+                            style = MaterialTheme.typography.labelMedium
+                        )
+                    }
+                }
+            }
         }
     }
 }

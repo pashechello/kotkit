@@ -10,6 +10,20 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
+ * Language for caption generation.
+ * Hashtags are always in English, but caption text can be in different languages.
+ */
+enum class CaptionLanguage(val code: String, val displayName: String, val promptInstruction: String) {
+    ENGLISH("en", "EN", "Write the caption text in English."),
+    RUSSIAN("ru", "RU", "Write the caption text in Russian (Cyrillic). Hashtags should still be in English.");
+
+    companion object {
+        fun fromCode(code: String): CaptionLanguage =
+            entries.find { it.code == code } ?: ENGLISH
+    }
+}
+
+/**
  * Manager for caption generation preferences.
  * Uses SharedPreferences for non-sensitive user tone settings.
  */
@@ -27,6 +41,9 @@ class CaptionPreferencesManager @Inject constructor(
 
     private val _isEnabledFlow = MutableStateFlow(isEnabled())
     val isEnabledFlow: Flow<Boolean> = _isEnabledFlow.asStateFlow()
+
+    private val _languageFlow = MutableStateFlow(getLanguage())
+    val languageFlow: Flow<CaptionLanguage> = _languageFlow.asStateFlow()
 
     /**
      * Get user's tone prompt for caption generation.
@@ -60,6 +77,22 @@ class CaptionPreferencesManager @Inject constructor(
     }
 
     /**
+     * Get caption language preference.
+     */
+    fun getLanguage(): CaptionLanguage {
+        val code = prefs.getString(KEY_LANGUAGE, CaptionLanguage.ENGLISH.code) ?: CaptionLanguage.ENGLISH.code
+        return CaptionLanguage.fromCode(code)
+    }
+
+    /**
+     * Set caption language preference.
+     */
+    fun setLanguage(language: CaptionLanguage) {
+        prefs.edit().putString(KEY_LANGUAGE, language.code).apply()
+        _languageFlow.value = language
+    }
+
+    /**
      * Get the effective tone prompt (returns null if disabled).
      */
     fun getEffectiveTonePrompt(): String? {
@@ -72,17 +105,34 @@ class CaptionPreferencesManager @Inject constructor(
     }
 
     /**
+     * Get effective tone prompt with language instruction included.
+     */
+    fun getEffectiveTonePromptWithLanguage(): String {
+        val parts = mutableListOf<String>()
+
+        // Add language instruction
+        parts.add(getLanguage().promptInstruction)
+
+        // Add user tone if enabled
+        getEffectiveTonePrompt()?.let { parts.add(it) }
+
+        return parts.joinToString(" ")
+    }
+
+    /**
      * Clear all caption preferences.
      */
     fun clear() {
         prefs.edit().clear().apply()
         _tonePromptFlow.value = ""
         _isEnabledFlow.value = true
+        _languageFlow.value = CaptionLanguage.ENGLISH
     }
 
     companion object {
         private const val PREFS_NAME = "caption_preferences"
         private const val KEY_TONE_PROMPT = "tone_prompt"
         private const val KEY_ENABLED = "enabled"
+        private const val KEY_LANGUAGE = "language"
     }
 }

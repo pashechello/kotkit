@@ -36,10 +36,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asComposeRenderEffect
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -48,10 +52,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.kotkit.basic.R
+import com.kotkit.basic.data.local.preferences.CaptionLanguage
 import com.kotkit.basic.scheduler.AudiencePersona
+import com.kotkit.basic.scheduler.BatchScheduleService
+import com.kotkit.basic.scheduler.ScheduleQuality
+import android.content.Intent
+import android.net.Uri
 import com.kotkit.basic.ui.components.BounceOverscrollContainer
 import com.kotkit.basic.ui.components.GlassCard
 import com.kotkit.basic.ui.components.GradientButton
+import com.kotkit.basic.ui.components.LoginPromptBottomSheet
+import com.kotkit.basic.ui.components.LoginPromptReason
 import com.kotkit.basic.ui.components.VideoThumbnail
 import com.kotkit.basic.ui.theme.*
 import com.commandiron.wheel_picker_compose.WheelDatePicker
@@ -78,6 +89,11 @@ fun NewPostScreen(
     val context = LocalContext.current
     var showSnackbar by remember { mutableStateOf<String?>(null) }
     var showAdvanced by remember { mutableStateOf(false) }
+
+    // Auth state
+    val isAuthenticated = viewModel.isAuthenticated
+    var showLoginPrompt by remember { mutableStateOf(false) }
+    var loginPromptReason by remember { mutableStateOf(LoginPromptReason.GENERAL) }
 
     // Photo Picker for multi-select video selection (works on all Android versions)
     val videoPickerLauncher = rememberLauncherForActivityResult(
@@ -134,7 +150,12 @@ fun NewPostScreen(
                     onShowAdvancedChange = { showAdvanced = it },
                     onPickVideos = { launchVideoPicker() },
                     onNavigateBack = onNavigateBack,
-                    onShowSnackbar = { showSnackbar = it }
+                    onShowSnackbar = { showSnackbar = it },
+                    isAuthenticated = isAuthenticated,
+                    onLoginRequired = { reason ->
+                        loginPromptReason = reason
+                        showLoginPrompt = true
+                    }
                 )
             } else {
                 // Single Mode UI
@@ -143,7 +164,12 @@ fun NewPostScreen(
                     viewModel = viewModel,
                     onPickVideo = { launchVideoPicker() },
                     onNavigateBack = onNavigateBack,
-                    onShowSnackbar = { showSnackbar = it }
+                    onShowSnackbar = { showSnackbar = it },
+                    isAuthenticated = isAuthenticated,
+                    onLoginRequired = { reason ->
+                        loginPromptReason = reason
+                        showLoginPrompt = true
+                    }
                 )
             }
         }
@@ -184,12 +210,12 @@ fun NewPostScreen(
             }
         }
 
-        // Snackbar
+        // Snackbar (top position for better visibility)
         showSnackbar?.let { message ->
             Box(
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(16.dp)
+                    .align(Alignment.TopCenter)
+                    .padding(top = 48.dp, start = 16.dp, end = 16.dp)
             ) {
                 GlassSnackbar(
                     message = message,
@@ -197,6 +223,19 @@ fun NewPostScreen(
                 )
             }
         }
+    }
+
+    // Login prompt bottom sheet
+    if (showLoginPrompt) {
+        LoginPromptBottomSheet(
+            onDismiss = { showLoginPrompt = false },
+            onLoginClick = {
+                showLoginPrompt = false
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://kotkit.pro/auth/app"))
+                context.startActivity(intent)
+            },
+            reason = loginPromptReason
+        )
     }
 }
 
@@ -208,7 +247,9 @@ private fun SingleModeContent(
     viewModel: NewPostViewModel,
     onPickVideo: () -> Unit,
     onNavigateBack: () -> Unit,
-    onShowSnackbar: (String) -> Unit
+    onShowSnackbar: (String) -> Unit,
+    isAuthenticated: Boolean,
+    onLoginRequired: (LoginPromptReason) -> Unit
 ) {
     BounceOverscrollContainer(
         modifier = Modifier.fillMaxSize()
@@ -258,13 +299,63 @@ private fun SingleModeContent(
 
                         // AI Generate button
                         GlassAIButton(
-                            onClick = { viewModel.generateCaption() },
+                            onClick = {
+                                if (!isAuthenticated) {
+                                    onLoginRequired(LoginPromptReason.AI_CAPTION)
+                                } else {
+                                    viewModel.generateCaption()
+                                }
+                            },
                             isLoading = uiState.isGeneratingCaption,
                             enabled = !uiState.isLoading && !uiState.isGeneratingCaption && uiState.videoPath != null
                         )
                     }
 
                     Spacer(modifier = Modifier.height(14.dp))
+
+                    // Language toggle (RU/EN)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = stringResource(R.string.caption_language_label),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary
+                        )
+
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(SurfaceGlassLight)
+                                .border(1.dp, BorderSubtle, RoundedCornerShape(8.dp))
+                        ) {
+                            CaptionLanguage.entries.forEach { language ->
+                                val isSelected = uiState.selectedLanguage == language
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(
+                                            if (isSelected) BrandPink.copy(alpha = 0.2f)
+                                            else Color.Transparent
+                                        )
+                                        .clickable { viewModel.setLanguage(language) }
+                                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = language.displayName,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (isSelected) BrandPink else TextMuted
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
 
                     // Glass text field
                     GlassTextField(
@@ -315,10 +406,14 @@ private fun SingleModeContent(
         item {
             GradientButton(
                 onClick = {
-                    viewModel.createPost(
-                        onSuccess = onNavigateBack,
-                        onError = { onShowSnackbar(it) }
-                    )
+                    if (!isAuthenticated) {
+                        onLoginRequired(LoginPromptReason.SCHEDULE_POST)
+                    } else {
+                        viewModel.createPost(
+                            onSuccess = onNavigateBack,
+                            onError = { onShowSnackbar(it) }
+                        )
+                    }
                 },
                 enabled = !uiState.isLoading && uiState.videoPath != null,
                 modifier = Modifier.fillMaxWidth()
@@ -347,10 +442,14 @@ private fun SingleModeContent(
                     .clickable(
                         enabled = !uiState.isLoading && uiState.videoPath != null,
                         onClick = {
-                            viewModel.postNow(
-                                onSuccess = onNavigateBack,
-                                onError = { onShowSnackbar(it) }
-                            )
+                            if (!isAuthenticated) {
+                                onLoginRequired(LoginPromptReason.SCHEDULE_POST)
+                            } else {
+                                viewModel.postNow(
+                                    onSuccess = onNavigateBack,
+                                    onError = { onShowSnackbar(it) }
+                                )
+                            }
                         }
                     )
                     .padding(vertical = 14.dp),
@@ -378,7 +477,9 @@ private fun BatchModeContent(
     onShowAdvancedChange: (Boolean) -> Unit,
     onPickVideos: () -> Unit,
     onNavigateBack: () -> Unit,
-    onShowSnackbar: (String) -> Unit
+    onShowSnackbar: (String) -> Unit,
+    isAuthenticated: Boolean,
+    onLoginRequired: (LoginPromptReason) -> Unit
 ) {
     BounceOverscrollContainer(
         modifier = Modifier.fillMaxSize()
@@ -402,7 +503,29 @@ private fun BatchModeContent(
         }
 
         // ═══════════════════════════════════════════════════════════
-        // SECTION 2: SCHEDULE SETTINGS
+        // SECTION 2: AI CAPTION GENERATION (first!)
+        // ═══════════════════════════════════════════════════════════
+        item {
+            BatchAICaptionSection(
+                isGenerating = uiState.isGeneratingCaptions,
+                progress = uiState.captionProgress,
+                videosCount = uiState.videos.size,
+                batchPrompt = uiState.batchPrompt,
+                onBatchPromptChange = { viewModel.setBatchPrompt(it) },
+                selectedLanguage = uiState.selectedLanguage,
+                onLanguageChange = { viewModel.setLanguage(it) },
+                onGenerate = {
+                    if (!isAuthenticated) {
+                        onLoginRequired(LoginPromptReason.AI_CAPTION)
+                    } else {
+                        viewModel.generateCaptions()
+                    }
+                }
+            )
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // SECTION 3: SCHEDULE SETTINGS
         // ═══════════════════════════════════════════════════════════
         item {
             BatchScheduleSection(
@@ -410,6 +533,8 @@ private fun BatchModeContent(
                 videosPerDay = uiState.videosPerDay,
                 totalVideos = uiState.videos.size,
                 selectedPersona = uiState.selectedPersona,
+                scheduleQuality = uiState.scheduleQuality,
+                effectiveIntervalMinutes = uiState.effectiveIntervalMinutes,
                 onDateChange = { viewModel.setStartDate(it) },
                 onVideosPerDayChange = { viewModel.setVideosPerDay(it) },
                 onPersonaChange = { viewModel.setPersona(it) }
@@ -417,29 +542,53 @@ private fun BatchModeContent(
         }
 
         // ═══════════════════════════════════════════════════════════
-        // SECTION 3: AI CAPTION GENERATION
+        // SECTION 4: SCHEDULE GENERATION BUTTON
         // ═══════════════════════════════════════════════════════════
-        item {
-            BatchAICaptionSection(
-                isGenerating = uiState.isGeneratingCaptions,
-                progress = uiState.captionProgress,
-                videosCount = uiState.videos.size,
-                onGenerate = { viewModel.generateCaptions() }
-            )
-        }
+        if (uiState.videos.size > 1) {
+            item {
+                Spacer(modifier = Modifier.height(8.dp))
 
-        // ═══════════════════════════════════════════════════════════
-        // SECTION 4: ADVANCED SETTINGS (collapsible)
-        // ═══════════════════════════════════════════════════════════
-        item {
-            BatchAdvancedSection(
-                showAdvanced = showAdvanced,
-                onShowAdvancedChange = onShowAdvancedChange,
-                useCustomHours = uiState.useCustomHours,
-                customHours = uiState.customHours,
-                onUseCustomHoursChange = { viewModel.setUseCustomHours(it) },
-                onCustomHoursChange = { viewModel.setCustomHours(it) }
-            )
+                if (uiState.schedulePreview == null) {
+                    // Show "Распланировать" button when times are not generated
+                    GradientButton(
+                        onClick = { viewModel.updatePreview() },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Schedule,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(stringResource(R.string.batch_schedule_generate))
+                    }
+                } else {
+                    // Show "Перепланировать" button when times are already generated
+                    OutlinedButton(
+                        onClick = { viewModel.updatePreview() },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(
+                                width = 1.dp,
+                                color = BrandPink.copy(alpha = 0.3f),
+                                shape = RoundedCornerShape(12.dp)
+                            ),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = BrandPink
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(stringResource(R.string.batch_schedule_regenerate))
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+            }
         }
 
         // ═══════════════════════════════════════════════════════════
@@ -457,7 +606,7 @@ private fun BatchModeContent(
 
             itemsIndexed(
                 items = uiState.previewItems,
-                key = { index, item -> "${item.video.uri}_$index" }
+                key = { _, item -> item.slot.videoIndex }  // Use stable videoIndex as key
             ) { index, previewItem ->
                 PostPreviewCard(
                     previewItem = previewItem,
@@ -474,17 +623,35 @@ private fun BatchModeContent(
         }
 
         // ═══════════════════════════════════════════════════════════
-        // SECTION 6: SCHEDULE ALL BUTTON
+        // SECTION 6: ADVANCED SETTINGS (collapsible)
+        // ═══════════════════════════════════════════════════════════
+        item {
+            BatchAdvancedSection(
+                showAdvanced = showAdvanced,
+                onShowAdvancedChange = onShowAdvancedChange,
+                useCustomHours = uiState.useCustomHours,
+                customHours = uiState.customHours,
+                onUseCustomHoursChange = { viewModel.setUseCustomHours(it) },
+                onCustomHoursChange = { viewModel.setCustomHours(it) }
+            )
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // SECTION 7: SCHEDULE ALL BUTTON
         // ═══════════════════════════════════════════════════════════
         item {
             Spacer(modifier = Modifier.height(4.dp))
 
             GradientButton(
                 onClick = {
-                    viewModel.scheduleAll(
-                        onSuccess = onNavigateBack,
-                        onError = { onShowSnackbar(it) }
-                    )
+                    if (!isAuthenticated) {
+                        onLoginRequired(LoginPromptReason.SCHEDULE_POST)
+                    } else {
+                        viewModel.scheduleAll(
+                            onSuccess = onNavigateBack,
+                            onError = { onShowSnackbar(it) }
+                        )
+                    }
                 },
                 enabled = uiState.videos.isNotEmpty() && !uiState.isScheduling,
                 modifier = Modifier.fillMaxWidth()
@@ -717,13 +884,16 @@ private fun BatchScheduleSection(
     videosPerDay: Int,
     totalVideos: Int,
     selectedPersona: AudiencePersona,
+    scheduleQuality: ScheduleQuality,
+    effectiveIntervalMinutes: Int,
     onDateChange: (LocalDate) -> Unit,
     onVideosPerDayChange: (Int) -> Unit,
     onPersonaChange: (AudiencePersona) -> Unit
 ) {
     val context = LocalContext.current
     val locale = context.resources.configuration.locales[0]
-    val maxVideosPerDay = totalVideos.coerceAtMost(10)
+    // Max is limited only by total videos and hard cap - algorithm adapts intervals
+    val maxVideosPerDay = minOf(totalVideos, BatchScheduleService.MAX_VIDEOS_PER_DAY)
     val currentYear = LocalDate.now().year
 
     // State for selected day and month
@@ -789,7 +959,15 @@ private fun BatchScheduleSection(
                     ) { index ->
                         selectedDay = index + 1
                         val validDay = selectedDay.coerceAtMost(daysInMonth)
-                        onDateChange(LocalDate.of(currentYear, selectedMonth, validDay))
+                        val newDate = LocalDate.of(currentYear, selectedMonth, validDay)
+
+                        // Block past dates - cannot select dates before today
+                        val today = LocalDate.now()
+                        if (newDate < today) {
+                            return@WheelTextPicker
+                        }
+
+                        onDateChange(newDate)
                     }
 
                     // Month picker
@@ -813,7 +991,15 @@ private fun BatchScheduleSection(
                         selectedMonth = index + 1
                         val newDaysInMonth = YearMonth.of(currentYear, selectedMonth).lengthOfMonth()
                         val validDay = selectedDay.coerceAtMost(newDaysInMonth)
-                        onDateChange(LocalDate.of(currentYear, selectedMonth, validDay))
+                        val newDate = LocalDate.of(currentYear, selectedMonth, validDay)
+
+                        // Block past dates - cannot select dates before today
+                        val today = LocalDate.now()
+                        if (newDate < today) {
+                            return@WheelTextPicker
+                        }
+
+                        onDateChange(newDate)
                     }
                 }
 
@@ -901,7 +1087,58 @@ private fun BatchScheduleSection(
                     }
                 }
 
-                // Audience Persona
+                // Duration info (after user selected date AND videos per day)
+                if (totalVideos > 0 && videosPerDay > 0) {
+                    val totalDays = (totalVideos + videosPerDay - 1) / videosPerDay
+                    Text(
+                        text = pluralStringResource(R.plurals.batch_schedule_duration_days, totalDays, totalDays),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TextTertiary,
+                        modifier = Modifier.padding(start = 4.dp, top = 4.dp)
+                    )
+                }
+
+                // Schedule quality warning (when intervals are compressed)
+                if (scheduleQuality != ScheduleQuality.OPTIMAL) {
+                    val warningColor = when (scheduleQuality) {
+                        ScheduleQuality.TIGHT -> Error
+                        else -> Warning
+                    }
+                    // Format interval: 120 -> "2h", 90 -> "90min", 60 -> "1h", 45 -> "45min", 30 -> "30min"
+                    val intervalText = if (effectiveIntervalMinutes % 60 == 0) {
+                        "${effectiveIntervalMinutes / 60}h"
+                    } else {
+                        "${effectiveIntervalMinutes}min"
+                    }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(warningColor.copy(alpha = 0.1f))
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Outlined.Info,
+                            contentDescription = null,
+                            tint = warningColor,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = when (scheduleQuality) {
+                                ScheduleQuality.GOOD -> stringResource(R.string.schedule_quality_good, intervalText)
+                                ScheduleQuality.COMPRESSED -> stringResource(R.string.schedule_quality_compressed, intervalText)
+                                ScheduleQuality.TIGHT -> stringResource(R.string.schedule_quality_tight)
+                                else -> ""
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = warningColor
+                        )
+                    }
+                }
+
+                // Audience Persona - Wheel Picker
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
                         text = stringResource(R.string.batch_schedule_audience),
@@ -909,39 +1146,40 @@ private fun BatchScheduleSection(
                         color = TextTertiary
                     )
 
-                    // Persona chips as a wrapping flow
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            AudiencePersona.entries.take(3).forEach { persona ->
-                                BatchPersonaChip(
-                                    persona = persona,
-                                    isSelected = selectedPersona == persona,
-                                    onClick = { onPersonaChange(persona) },
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-                        }
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            AudiencePersona.entries.drop(3).forEach { persona ->
-                                BatchPersonaChip(
-                                    persona = persona,
-                                    isSelected = selectedPersona == persona,
-                                    onClick = { onPersonaChange(persona) },
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-                            // Fill remaining space if odd number
-                            if (AudiencePersona.entries.size % 3 != 0) {
-                                repeat(3 - (AudiencePersona.entries.size % 3)) {
-                                    Spacer(modifier = Modifier.weight(1f))
-                                }
-                            }
+                    // Wheel picker for persona selection (casino-style)
+                    // Filter out WORKER as it's similar to STUDENT
+                    val personas = AudiencePersona.entries.filter { it != AudiencePersona.WORKER }
+                    val personaTexts = personas.map { persona ->
+                        stringResource(persona.displayNameRes)
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .nestedScroll(consumeRemainingScroll)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(BrandPink.copy(alpha = 0.1f))
+                            .border(1.dp, BrandPink.copy(alpha = 0.3f), RoundedCornerShape(14.dp))
+                            .padding(vertical = 8.dp),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        WheelTextPicker(
+                            texts = personaTexts,
+                            startIndex = personas.indexOf(selectedPersona).coerceAtLeast(0),
+                            rowCount = 3,
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontWeight = FontWeight.Medium
+                            ),
+                            color = TextPrimary,
+                            selectorProperties = WheelPickerDefaults.selectorProperties(
+                                enabled = true,
+                                shape = RoundedCornerShape(10.dp),
+                                color = BrandPink.copy(alpha = 0.15f),
+                                border = BorderStroke(1.dp, BrandPink.copy(alpha = 0.3f))
+                            ),
+                            modifier = Modifier.fillMaxWidth(0.9f)
+                        ) { index ->
+                            onPersonaChange(personas[index])
                         }
                     }
                 }
@@ -951,39 +1189,14 @@ private fun BatchScheduleSection(
 }
 
 @Composable
-private fun BatchPersonaChip(
-    persona: AudiencePersona,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val backgroundColor = if (isSelected) BrandPink.copy(alpha = 0.2f) else SurfaceGlassLight
-    val borderColor = if (isSelected) BrandPink.copy(alpha = 0.5f) else BorderSubtle
-    val textColor = if (isSelected) BrandPink else TextSecondary
-
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(backgroundColor)
-            .border(1.dp, borderColor, RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick)
-            .padding(vertical = 12.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = stringResource(persona.displayNameRes),
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-            color = textColor
-        )
-    }
-}
-
-@Composable
 private fun BatchAICaptionSection(
     isGenerating: Boolean,
     progress: Int,
     videosCount: Int,
+    batchPrompt: String,
+    onBatchPromptChange: (String) -> Unit,
+    selectedLanguage: CaptionLanguage,
+    onLanguageChange: (CaptionLanguage) -> Unit,
     onGenerate: () -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -1035,6 +1248,59 @@ private fun BatchAICaptionSection(
                     color = TextTertiary,
                     textAlign = TextAlign.Center
                 )
+
+                // Prompt input field
+                GlassTextField(
+                    value = batchPrompt,
+                    onValueChange = onBatchPromptChange,
+                    placeholder = stringResource(R.string.batch_prompt_placeholder),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(80.dp)
+                )
+
+                // Language toggle (RU/EN)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = stringResource(R.string.caption_language_label),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextSecondary
+                    )
+
+                    // Segmented button for language selection
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(SurfaceGlassLight)
+                            .border(1.dp, BorderSubtle, RoundedCornerShape(10.dp))
+                    ) {
+                        CaptionLanguage.entries.forEach { language ->
+                            val isSelected = selectedLanguage == language
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(
+                                        if (isSelected) GradientPurple.copy(alpha = 0.2f)
+                                        else Color.Transparent
+                                    )
+                                    .clickable { onLanguageChange(language) }
+                                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = language.displayName,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSelected) GradientPurple else TextMuted
+                                )
+                            }
+                        }
+                    }
+                }
 
                 // Progress or Generate button
                 if (isGenerating) {
@@ -1317,7 +1583,7 @@ private fun PostPreviewCard(
             }
         }
 
-        // Expandable Time Picker
+        // Expandable Time Picker with local state (apply only on OK)
         AnimatedVisibility(
             visible = showTimePicker,
             enter = expandVertically() + fadeIn(),
@@ -1327,9 +1593,10 @@ private fun PostPreviewCard(
             val locale = context.resources.configuration.locales[0]
             val currentYear = LocalDate.now().year
 
-            // State for selected day and month
-            var selectedDay by remember(currentDateTime) { mutableIntStateOf(currentDateTime.dayOfMonth) }
-            var selectedMonth by remember(currentDateTime) { mutableIntStateOf(currentDateTime.monthValue) }
+            // LOCAL state for editing - only applied on OK button
+            var editingDay by remember(currentDateTime) { mutableIntStateOf(currentDateTime.dayOfMonth) }
+            var editingMonth by remember(currentDateTime) { mutableIntStateOf(currentDateTime.monthValue) }
+            var editingTime by remember(currentDateTime) { mutableStateOf(currentDateTime.toLocalTime()) }
 
             // Generate month names
             val monthNames = remember(locale) {
@@ -1337,8 +1604,8 @@ private fun PostPreviewCard(
             }
 
             // Calculate days in selected month
-            val daysInMonth = remember(selectedMonth) {
-                YearMonth.of(currentYear, selectedMonth).lengthOfMonth()
+            val daysInMonth = remember(editingMonth) {
+                YearMonth.of(currentYear, editingMonth).lengthOfMonth()
             }
             val daysList = remember(daysInMonth) { (1..daysInMonth).map { it.toString() } }
 
@@ -1372,10 +1639,10 @@ private fun PostPreviewCard(
                         .padding(vertical = 6.dp, horizontal = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(0.dp)
                 ) {
-                    // Day picker
+                    // Day picker - updates LOCAL state only
                     WheelTextPicker(
                         texts = daysList,
-                        startIndex = (selectedDay - 1).coerceIn(0, daysList.size - 1),
+                        startIndex = (editingDay - 1).coerceIn(0, daysList.size - 1),
                         rowCount = 3,
                         style = MaterialTheme.typography.bodyLarge.copy(
                             fontWeight = FontWeight.Bold,
@@ -1390,16 +1657,13 @@ private fun PostPreviewCard(
                         ),
                         modifier = Modifier.weight(0.35f)
                     ) { index ->
-                        selectedDay = index + 1
-                        val validDay = selectedDay.coerceAtMost(daysInMonth)
-                        val newDate = LocalDate.of(currentYear, selectedMonth, validDay)
-                        onTimeChange(LocalDateTime.of(newDate, currentDateTime.toLocalTime()))
+                        editingDay = (index + 1).coerceAtMost(daysInMonth)
                     }
 
-                    // Month picker
+                    // Month picker - updates LOCAL state only
                     WheelTextPicker(
                         texts = monthNames,
-                        startIndex = selectedMonth - 1,
+                        startIndex = editingMonth - 1,
                         rowCount = 3,
                         style = MaterialTheme.typography.bodyLarge.copy(
                             fontWeight = FontWeight.Bold,
@@ -1414,15 +1678,14 @@ private fun PostPreviewCard(
                         ),
                         modifier = Modifier.weight(0.65f)
                     ) { index ->
-                        selectedMonth = index + 1
-                        val newDaysInMonth = YearMonth.of(currentYear, selectedMonth).lengthOfMonth()
-                        val validDay = selectedDay.coerceAtMost(newDaysInMonth)
-                        val newDate = LocalDate.of(currentYear, selectedMonth, validDay)
-                        onTimeChange(LocalDateTime.of(newDate, currentDateTime.toLocalTime()))
+                        editingMonth = index + 1
+                        // Adjust day if needed for new month
+                        val newDaysInMonth = YearMonth.of(currentYear, editingMonth).lengthOfMonth()
+                        editingDay = editingDay.coerceAtMost(newDaysInMonth)
                     }
                 }
 
-                // Time wheel picker - fully PINK
+                // Time wheel picker - fully PINK, updates LOCAL state only
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1432,7 +1695,7 @@ private fun PostPreviewCard(
                         .padding(vertical = 6.dp)
                 ) {
                     WheelTimePicker(
-                        startTime = currentDateTime.toLocalTime(),
+                        startTime = editingTime,
                         rowCount = 3,
                         textStyle = MaterialTheme.typography.bodyLarge.copy(
                             fontWeight = FontWeight.Bold,
@@ -1447,9 +1710,43 @@ private fun PostPreviewCard(
                         ),
                         modifier = Modifier.fillMaxWidth()
                     ) { selectedTime ->
-                        val validDay = selectedDay.coerceAtMost(daysInMonth)
-                        val newDate = LocalDate.of(currentYear, selectedMonth, validDay)
-                        onTimeChange(LocalDateTime.of(newDate, selectedTime))
+                        editingTime = selectedTime
+                    }
+                }
+
+                // Action buttons: Cancel and OK
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Cancel button - just closes the picker
+                    OutlinedButton(
+                        onClick = { showTimePicker = false },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = TextSecondary
+                        ),
+                        border = BorderStroke(1.dp, BorderDefault)
+                    ) {
+                        Text(stringResource(R.string.action_cancel))
+                    }
+
+                    // OK button - applies changes and closes
+                    Button(
+                        onClick = {
+                            val validDay = editingDay.coerceAtMost(daysInMonth)
+                            val newDate = LocalDate.of(currentYear, editingMonth, validDay)
+                            val newDateTime = LocalDateTime.of(newDate, editingTime)
+                            onTimeChange(newDateTime)
+                            showTimePicker = false
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = BrandCyan,
+                            contentColor = Color.White
+                        )
+                    ) {
+                        Text(stringResource(R.string.dialog_ok))
                     }
                 }
             }
@@ -2070,44 +2367,106 @@ private fun GlassSnackbar(
     message: String,
     onDismiss: () -> Unit
 ) {
-    Row(
+    val shape = RoundedCornerShape(16.dp)
+
+    // Glassmorphism container
+    Box(
         modifier = Modifier
             .fillMaxWidth()
             .shadow(
-                elevation = 12.dp,
-                shape = RoundedCornerShape(16.dp),
-                ambientColor = Error.copy(alpha = 0.2f)
+                elevation = 24.dp,
+                shape = shape,
+                ambientColor = Color.Black.copy(alpha = 0.3f),
+                spotColor = Color.Black.copy(alpha = 0.3f)
             )
-            .clip(RoundedCornerShape(16.dp))
-            .background(SurfaceElevated2)
-            .border(1.dp, Error.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
-            .padding(16.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+            .clip(shape)
+            .graphicsLayer {
+                // Apply blur effect for glass look (API 31+)
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                    renderEffect = android.graphics.RenderEffect
+                        .createBlurEffect(25f, 25f, android.graphics.Shader.TileMode.CLAMP)
+                        .asComposeRenderEffect()
+                }
+            }
     ) {
+        // Glass background with gradient
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = 0.15f),
+                            Color.White.copy(alpha = 0.08f)
+                        )
+                    )
+                )
+                .border(
+                    width = 1.dp,
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = 0.3f),
+                            Color.White.copy(alpha = 0.1f)
+                        )
+                    ),
+                    shape = shape
+                )
+        )
+
+        // Content
         Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.weight(1f)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                Icons.Default.Error,
-                contentDescription = null,
-                tint = Error,
-                modifier = Modifier.size(22.dp)
-            )
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextPrimary
-            )
-        }
-        IconButton(onClick = onDismiss) {
-            Icon(
-                Icons.Default.Close,
-                contentDescription = stringResource(R.string.dismiss),
-                tint = TextTertiary
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                // Error icon with glow
+                Box(
+                    contentAlignment = Alignment.Center
+                ) {
+                    // Glow effect
+                    Icon(
+                        Icons.Default.Error,
+                        contentDescription = null,
+                        tint = Error.copy(alpha = 0.4f),
+                        modifier = Modifier
+                            .size(28.dp)
+                            .graphicsLayer {
+                                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                                    renderEffect = android.graphics.RenderEffect
+                                        .createBlurEffect(8f, 8f, android.graphics.Shader.TileMode.CLAMP)
+                                        .asComposeRenderEffect()
+                                }
+                            }
+                    )
+                    // Main icon
+                    Icon(
+                        Icons.Default.Error,
+                        contentDescription = null,
+                        tint = Error,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = TextPrimary
+                )
+            }
+            IconButton(onClick = onDismiss) {
+                Icon(
+                    Icons.Default.Close,
+                    contentDescription = stringResource(R.string.dismiss),
+                    tint = TextSecondary
+                )
+            }
         }
     }
 }

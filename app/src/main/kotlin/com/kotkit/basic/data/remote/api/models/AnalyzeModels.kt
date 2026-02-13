@@ -46,7 +46,7 @@ data class AnalyzeContext(
     @SerializedName("video_filename") val videoFilename: String,
     val caption: String,
     @SerializedName("previous_actions") val previousActions: List<String>,
-    @SerializedName("launch_method") val launchMethod: String? = null  // "SHARE_INTENT" or "NORMAL_LAUNCH"
+    @SerializedName("launch_method") val launchMethod: String? = null  // Always "SHARE_INTENT"
 )
 
 // Response with action to execute
@@ -83,14 +83,13 @@ object ActionType {
     const val TYPE_TEXT = "type_text"
     const val WAIT = "wait"
     const val BACK = "back"
-    const val LAUNCH_TIKTOK = "launch_tiktok"
+    // NOTE: LAUNCH_TIKTOK removed - Share Intent is the only supported flow
     const val DISMISS_POPUP = "dismiss_popup"
+    const val NAVIGATE_TO_FEED = "navigate_to_feed"
     const val FINISH = "finish"
-    const val READ_CLIPBOARD = "read_clipboard"  // Post & Check: read TikTok URL from clipboard
 
     // Legacy aliases for compatibility
     const val TYPE = "type_text"
-    const val OPEN_APP = "launch_tiktok"
     const val DONE = "finish"
     const val ERROR = "error"
 }

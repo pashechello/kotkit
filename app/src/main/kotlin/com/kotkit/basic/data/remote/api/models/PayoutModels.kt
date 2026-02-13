@@ -30,7 +30,7 @@ data class EarningResponse(
     @SerializedName("task_id") val taskId: String,
     @SerializedName("campaign_id") val campaignId: String,
     @SerializedName("campaign_name") val campaignName: String?,
-    @SerializedName("amount_usd") val amountUsd: Float,
+    @SerializedName("amount_rub") val amountRub: Float,
     val status: String, // pending, approved, available, paid, cancelled
     @SerializedName("created_at") val createdAt: Long,
     @SerializedName("approved_at") val approvedAt: Long?,
@@ -49,14 +49,14 @@ data class EarningsListResponse(
 // ============================================================================
 
 data class PayoutRequestCreate(
-    @SerializedName("amount_usd") val amountUsd: Float,
+    @SerializedName("amount_rub") val amountRub: Float,
     val method: String, // crypto, card, sbp
     val currency: String, // USDT, RUB, TRX, TON
     @SerializedName("wallet_address") val walletAddress: String
 ) {
     // Mask sensitive data in logs
     override fun toString(): String {
-        return "PayoutRequestCreate(amount=$amountUsd, method=$method, " +
+        return "PayoutRequestCreate(amount=$amountRub, method=$method, " +
             "currency=$currency, wallet=${walletAddress.maskMiddle()})"
     }
 
@@ -67,7 +67,7 @@ data class PayoutRequestCreate(
 
 data class PayoutResponse(
     val id: String,
-    @SerializedName("amount_usd") val amountUsd: Float,
+    @SerializedName("amount_rub") val amountRub: Float,
     val currency: String,
     @SerializedName("amount_currency") val amountCurrency: Float?,
     val method: String,

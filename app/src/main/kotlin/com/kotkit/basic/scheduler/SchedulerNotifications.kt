@@ -6,6 +6,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.util.Log
@@ -18,14 +19,7 @@ import com.kotkit.basic.ui.MainActivity
 
 /**
  * Helper object for Smart Scheduler notifications.
- *
- * Notification types:
- * - Warning (10 min before): "Публикация через 10 минут. Оставьте телефон в покое"
- * - Final warning (1 min before): "Публикация через 1 минуту!"
- * - Starting: "Начинаю публикацию..."
- * - Device busy: "Телефон занят. Повтор через 5 минут"
- * - Success: "Готово! Видео опубликовано"
- * - Failed: "Не удалось опубликовать"
+ * All notifications have cute cat-themed messages and the KotKit logo! 🐱
  *
  * Includes Android 13+ POST_NOTIFICATIONS permission check.
  */
@@ -42,7 +36,36 @@ object SchedulerNotifications {
     // Max value for safe notification ID calculation
     private const val NOTIFICATION_ID_MODULO = 9_000
 
-    // Cute cat messages for "device busy" notification
+    // 🐱 Cat-themed messages for all notification types
+
+    // Warning messages (before posting)
+    private val warningMessages10Min = listOf(
+        "Мур! Через 10 минут начну постить. Положи телефон! 🐱",
+        "Мяу~ Скоро буду работать! Оставь телефон в покое 😺",
+        "Муррр... 10 минут до поста. Не трогай меня! 🐾"
+    )
+
+    private val warningMessages2Min = listOf(
+        "Мяу! Почти пора! Ещё пару минут... 😸",
+        "Мур-мур! Готовлюсь к прыжку на TikTok! 🐱",
+        "Мяяяу! Скоро начну, не мешай! 🐾"
+    )
+
+    private val warningMessages1Min = listOf(
+        "МЯУ! ОДНА МИНУТА! Не трогай!!! 🙀",
+        "МУРРР! Сейчас начну! Лапы прочь от телефона! 😼",
+        "Мяу-мяу-мяу! Уже бегу постить! 🏃‍♂️🐱"
+    )
+
+    // Starting messages
+    private val startingMessages = listOf(
+        "Мур! Побежал в TikTok! 🏃‍♂️🐱",
+        "Мяу~ Начинаю колдовать... ✨🐾",
+        "Муррр... Работаю, не мешай! 😺",
+        "Мяу! Захватываю TikTok! 🐱💪"
+    )
+
+    // Busy messages (device in use)
     private val busyMessages = listOf(
         "Мур! Хотел выложить пост, но подожду пока освободишься 🐱",
         "Мур-мур! Ты занят, выложу попозже 😺",
@@ -53,6 +76,23 @@ object SchedulerNotifications {
         "Мур-мяу! Пост ждёт, а ты занят 🐾",
         "Муррр... Ничего, запощу позже! 😸",
         "Мяу! Телефон занят, подождём вместе 🐱"
+    )
+
+    // Success messages
+    private val successMessages = listOf(
+        "МЯЯЯУ! Готово! Пост улетел в TikTok! 🎉🐱",
+        "Муррр~ Сделано! Я молодец! 😸✨",
+        "Мяу! Запостил! Можешь гладить! 🐾💕",
+        "Мур-мур-мур! Успех! Видео в TikTok! 🚀🐱",
+        "Мяу~ Всё получилось! Дай вкусняшку! 😺🍪"
+    )
+
+    // Error messages
+    private val errorMessages = listOf(
+        "Мяу... Что-то пошло не так... 😿",
+        "Мур... Не получилось, простите... 🙀",
+        "Мяяяу~ Ошибка! Попробуй ещё раз? 😾",
+        "Муррр... Провал. Но я старался! 😿🐾"
     )
 
     /**
@@ -79,6 +119,12 @@ object SchedulerNotifications {
     }
 
     /**
+     * Get the KotKit logo as a large icon for notifications.
+     */
+    private fun getLargeIcon(context: Context) =
+        BitmapFactory.decodeResource(context.resources, R.drawable.logo)
+
+    /**
      * Show warning notification before scheduled posting.
      */
     fun showWarningNotification(context: Context, postId: Long, minutesBefore: Int) {
@@ -95,18 +141,18 @@ object SchedulerNotifications {
 
         when {
             minutesBefore >= 10 -> {
-                title = "Публикация через $minutesBefore минут"
-                text = "Оставьте телефон в покое для автоматической публикации"
+                title = "⏰ $minutesBefore минут до поста"
+                text = warningMessages10Min.random()
                 priority = NotificationCompat.PRIORITY_DEFAULT
             }
             minutesBefore >= 2 -> {
-                title = "Публикация через $minutesBefore минут"
-                text = "Скоро начнётся автоматическая публикация"
+                title = "⏰ $minutesBefore минут!"
+                text = warningMessages2Min.random()
                 priority = NotificationCompat.PRIORITY_DEFAULT
             }
             else -> {
-                title = "Публикация через 1 минуту!"
-                text = "Не трогайте телефон"
+                title = "🚨 1 МИНУТА!"
+                text = warningMessages1Min.random()
                 priority = NotificationCompat.PRIORITY_HIGH
             }
         }
@@ -125,12 +171,13 @@ object SchedulerNotifications {
 
         val notification = NotificationCompat.Builder(context, App.CHANNEL_SCHEDULED)
             .setSmallIcon(R.drawable.ic_schedule)
+            .setLargeIcon(getLargeIcon(context))
             .setContentTitle(title)
             .setContentText(text)
             .setPriority(priority)
             .setAutoCancel(false)
             .setOngoing(true)
-            .addAction(R.drawable.ic_cancel, "Отменить", cancelPendingIntent)
+            .addAction(R.drawable.ic_cancel, "Отменить 🐾", cancelPendingIntent)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setSound(getSoundUri(context, SoundType.MEOW_WARNING))
             .build()
@@ -155,13 +202,30 @@ object SchedulerNotifications {
         // Cancel warning notification
         notificationManager.cancel(calculateNotificationId(WARNING_NOTIFICATION_OFFSET, postId))
 
+        val message = startingMessages.random()
+
+        // Stop action - backup stop button in case foreground notification doesn't show
+        val stopIntent = Intent(context, StopPostingReceiver::class.java).apply {
+            action = StopPostingReceiver.ACTION_STOP_POSTING
+            putExtra("post_id", postId)  // Pass postId to cancel notification
+        }
+        val stopPendingIntent = PendingIntent.getBroadcast(
+            context,
+            calculateNotificationId(POSTING_NOTIFICATION_OFFSET, postId),
+            stopIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         val notification = NotificationCompat.Builder(context, App.CHANNEL_POSTING)
             .setSmallIcon(R.drawable.ic_upload)
-            .setContentTitle("Начинаю публикацию")
-            .setContentText("Не трогайте телефон...")
+            .setLargeIcon(getLargeIcon(context))
+            .setContentTitle("🚀 Поехали!")
+            .setContentText(message)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(true)
             .setProgress(0, 0, true)
+            .addAction(R.drawable.ic_cancel, "Остановить 🐾", stopPendingIntent)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(message))
             .setSound(getSoundUri(context, SoundType.MEOW_STARTING))
             .build()
 
@@ -202,13 +266,14 @@ object SchedulerNotifications {
 
         val notification = NotificationCompat.Builder(context, App.CHANNEL_SCHEDULED)
             .setSmallIcon(R.drawable.ic_schedule)
-            .setContentTitle("🐱")
+            .setLargeIcon(getLargeIcon(context))
+            .setContentTitle("😺 Подожду...")
             .setContentText(message)
             .setStyle(NotificationCompat.BigTextStyle().bigText(message))
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(true)
             .setOngoing(false)
-            .addAction(R.drawable.ic_upload, "Опубликовать сейчас", forcePublishPendingIntent)
+            .addAction(R.drawable.ic_upload, "Постить сейчас! 🚀", forcePublishPendingIntent)
             .setSound(getSoundUri(context, SoundType.MEOW_UI))
             .build()
 
@@ -242,10 +307,14 @@ object SchedulerNotifications {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        val catMessage = successMessages.random()
+
         val notification = NotificationCompat.Builder(context, App.CHANNEL_ALERTS)
             .setSmallIcon(R.drawable.ic_check)
-            .setContentTitle("Готово!")
-            .setContentText(message ?: "Видео опубликовано в TikTok")
+            .setLargeIcon(getLargeIcon(context))
+            .setContentTitle("🎉 Мяу! Успех!")
+            .setContentText(catMessage)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(catMessage))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
             .setContentIntent(openPendingIntent)
@@ -282,14 +351,18 @@ object SchedulerNotifications {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        val catMessage = errorMessages.random()
+        val fullMessage = "$catMessage\n\n$reason"
+
         val notification = NotificationCompat.Builder(context, App.CHANNEL_ALERTS)
             .setSmallIcon(R.drawable.ic_error)
-            .setContentTitle("Не удалось опубликовать")
-            .setContentText(reason)
+            .setLargeIcon(getLargeIcon(context))
+            .setContentTitle("😿 Мяу... Ошибка")
+            .setContentText(catMessage)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
             .setContentIntent(openPendingIntent)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(reason))
+            .setStyle(NotificationCompat.BigTextStyle().bigText(fullMessage))
             .setSound(getSoundUri(context, SoundType.MEOW_ERROR))
             .build()
 

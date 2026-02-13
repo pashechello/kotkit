@@ -18,6 +18,17 @@
     <string name="notification_channel_alerts">Уведомления о постах</string>
     <string name="notification_channel_scheduled">Запланированные посты</string>
 
+    <!-- Worker Mode Notifications -->
+    <string name="worker_notif_executing">🚀 Выполняется задача…</string>
+    <string name="worker_notif_limit_reached">✅ Дневной лимит достигнут (%1$d/%2$d)</string>
+    <string name="worker_notif_active">🤖 KotKit Воркер активен</string>
+    <string name="worker_notif_posting">Публикация в TikTok…</string>
+    <string name="worker_notif_progress">Сегодня: %1$d/%2$d задач • Заработано: %3$.2f ₽</string>
+    <string name="worker_notif_waiting">Ожидание задач • Следующая проверка: %1$dс</string>
+    <string name="worker_notif_big_text">Статус: %1$s\nПрогресс: %2$d/%3$d задач сегодня\nЗаработано: %4$.2f ₽\n\nKotKit зарабатывает деньги для вас в фоне.\nМожете спокойно закрыть приложение.</string>
+    <string name="worker_status_working">Работает</string>
+    <string name="worker_status_waiting">Ожидание</string>
+
     <!-- Actions -->
     <string name="action_new_post">Новый пост</string>
     <string name="action_schedule">Запланировать</string>
@@ -51,6 +62,7 @@
     <string name="settings_language_subtitle">Выберите язык приложения</string>
     <string name="language_russian">Русский</string>
     <string name="language_english">English</string>
+    <string name="settings_target_audience">Целевая аудитория</string>
     <string name="settings_accessibility">Специальные возможности</string>
     <string name="settings_screen_unlock">Разблокировка экрана</string>
     <string name="settings_account">Аккаунт</string>
@@ -64,6 +76,17 @@
     <string name="settings_version">Версия</string>
     <string name="settings_privacy_policy">Политика конфиденциальности</string>
     <string name="dialog_ok">OK</string>
+
+    <!-- TikTok Username -->
+    <string name="settings_tiktok">TikTok</string>
+    <string name="settings_tiktok_username">Имя в TikTok</string>
+    <string name="settings_tiktok_not_set">Не указано</string>
+    <string name="tiktok_username_dialog_title">Введите имя в TikTok</string>
+    <string name="tiktok_username_dialog_subtitle">Обязательно для Режима Работника. Мы проверим ваши публикации по этому профилю.</string>
+    <string name="tiktok_username_hint">username</string>
+    <string name="tiktok_username_invalid">Некорректное имя (только буквы, цифры, точки и подчёркивания)</string>
+    <string name="tiktok_username_save">Сохранить</string>
+    <string name="tiktok_username_cancel">Отмена</string>
 
     <!-- Home Screen -->
     <string name="home_upcoming_posts">Ближайшие посты</string>
@@ -96,9 +119,7 @@
     <string name="settings_accessibility_service">Служба специальных возможностей</string>
     <string name="settings_accessibility_enabled">Включено — готово к автоматизации TikTok</string>
     <string name="settings_accessibility_not_enabled">Не включено — требуется для автоматизации</string>
-    <string name="settings_overlay_permission">Плавающий индикатор</string>
-    <string name="settings_overlay_enabled">Включено — иконка статуса будет видна</string>
-    <string name="settings_overlay_not_enabled">Не включено — для экстренной остановки</string>
+    <string name="settings_checking">Проверка…</string>
     <string name="settings_notification_permission">Уведомления</string>
     <string name="settings_notification_enabled">Включено — будете видеть статус публикации</string>
     <string name="settings_notification_not_enabled">Не включено — нужно для отображения прогресса</string>
@@ -106,6 +127,22 @@
     <string name="settings_pin_saved">PIN сохранён</string>
     <string name="settings_password_saved">Пароль сохранён</string>
     <string name="settings_not_configured">Не настроено — требуется для запланированных постов</string>
+    <string name="settings_worker_reliability">Для стабильной работы</string>
+    <string name="settings_battery_optimization">Оптимизация батареи</string>
+    <string name="settings_battery_disabled">Отключена — воркер работает надежно</string>
+    <string name="settings_battery_enabled">Включена — может останавливать фоновые задачи</string>
+    <string name="settings_oem_autostart">%1$s Разрешения</string>
+    <string name="settings_oem_autostart_subtitle">Требуется для устройств %1$s для публикации из фона</string>
+    <string name="settings_oem_autostart_enabled">Включены — фоновая публикация работает</string>
+    <string name="autostart_confirm_title">Разрешения включены?</string>
+    <string name="autostart_confirm_message">Вы включили ВСЕ разрешения для KotKit?\n\n• Автозапуск\n• Показ на экране блокировки\n• Всплывающие окна</string>
+    <string name="autostart_confirm_yes">Да, все включены</string>
+    <string name="autostart_confirm_no">Ещё нет</string>
+    <string name="autostart_manual_title">Включите вручную</string>
+    <string name="autostart_manual_message">Не удалось открыть настройки автоматически.\n\nВключите разрешения вручную:\n\n%1$s</string>
+    <string name="autostart_manual_open_settings">Открыть настройки</string>
+    <string name="autostart_manual_done">Готово</string>
+    <string name="fix">Исправить</string>
 
     <!-- Caption Preferences Screen -->
     <string name="caption_prefs_title">Стиль подписей</string>
@@ -128,6 +165,7 @@
 
     <!-- Queue Screen -->
     <string name="queue_no_scheduled">Нет запланированных постов</string>
+    <string name="queue_count_scheduled">%d запланировано</string>
 
     <!-- History Screen -->
     <string name="history_title">История</string>
@@ -158,16 +196,24 @@
     <string name="post_tomorrow">Завтра, %s</string>
 
     <!-- Audience Personas -->
+    <string name="persona_dialog_title">Целевая аудитория</string>
+    <string name="persona_dialog_explanation">Выбери, для кого ты создаёшь контент. Мы будем публиковать посты в то время, когда эта аудитория наиболее активна в TikTok.</string>
+    <string name="persona_peak_hours">Пиковые часы:</string>
     <string name="persona_student_name">Студенты</string>
     <string name="persona_student_desc">Перед парами, обед, вечер, поздно ночью</string>
-    <string name="persona_worker_name">Офис</string>
+    <string name="persona_student_emoji">📚</string>
+    <string name="persona_worker_name">Офисные работники</string>
     <string name="persona_worker_desc">Утренняя дорога, обед, после работы</string>
+    <string name="persona_worker_emoji">💼</string>
     <string name="persona_night_owl_name">Совы</string>
     <string name="persona_night_owl_desc">Поздний подъём, день, вечерний пик</string>
+    <string name="persona_night_owl_emoji">🦉</string>
     <string name="persona_parent_name">Родители</string>
     <string name="persona_parent_desc">После утренних дел, дневной сон, вечер</string>
+    <string name="persona_parent_emoji">👨‍👩‍👧</string>
     <string name="persona_general_name">Любая</string>
     <string name="persona_general_desc">Стандартные пиковые часы</string>
+    <string name="persona_general_emoji">🌐</string>
 
     <!-- Batch Schedule Screen -->
     <string name="batch_schedule_title">Массовое расписание</string>
@@ -196,9 +242,20 @@
     <string name="batch_schedule_settings">Расписание</string>
     <string name="batch_schedule_per_day">Видео в день</string>
     <string name="batch_schedule_videos_count">%d видео</string>
-    <string name="batch_schedule_audience">Целевая аудитория</string>
+    <string name="batch_schedule_audience">Время публикации</string>
+    <plurals name="batch_schedule_duration_days">
+        <item quantity="one">Займёт %d день</item>
+        <item quantity="few">Займёт %d дня</item>
+        <item quantity="many">Займёт %d дней</item>
+        <item quantity="other">Займёт %d дней</item>
+    </plurals>
+    <string name="batch_schedule_generate">Распланировать</string>
+    <string name="batch_schedule_regenerate">Перепланировать</string>
     <string name="batch_schedule_ai_captions">AI Подписи</string>
     <string name="batch_schedule_ai_description">Сгенерируйте подписи для всех видео с помощью AI</string>
+    <string name="batch_prompt_placeholder">Опишите ваши видео или стиль…</string>
+    <string name="caption_language_label">Язык подписи</string>
+    <string name="error_auth_required_for_ai">Войдите в аккаунт для использования AI</string>
     <string name="batch_schedule_generate_all">Сгенерировать для %d видео</string>
     <string name="batch_schedule_generating_progress">Генерация… %d%%</string>
     <string name="batch_schedule_post_preview">Превью постов</string>
@@ -207,6 +264,11 @@
     <string name="remove">Удалить</string>
     <string name="decrease">Уменьшить</string>
     <string name="increase">Увеличить</string>
+
+    <!-- Schedule Quality Indicators -->
+    <string name="schedule_quality_good">Расширенные часы (интервал %1$s)</string>
+    <string name="schedule_quality_compressed">Сжатое расписание (интервал %1$s)</string>
+    <string name="schedule_quality_tight">Очень плотное расписание — выберите меньше видео</string>
 
     <!-- Exact Alarm Permission -->
     <string name="exact_alarm_action_fix">Исправить</string>
@@ -223,10 +285,35 @@
     <string name="worker_screen_title">Начать зарабатывать</string>
     <string name="worker_button_money">БАБЛО</string>
     <string name="worker_coming_soon">Скоро будет доступно</string>
+    <string name="worker_mode_active">Теперь вы зарабатываете!</string>
+    <string name="worker_mode_inactive">Нажмите чтобы начать зарабатывать</string>
+    <string name="worker_stop_confirm_title">Прекратить работу?</string>
+    <string name="worker_stop_confirm_message">Вы уверены что хотите уйти в оффлайн? Вы не будете получать новые задания.</string>
+    <string name="worker_stop_confirm_yes">Остановить</string>
+    <string name="worker_stop_confirm_no">Отмена</string>
     <string name="worker_your_income">Ваш доход</string>
-    <string name="worker_available_to_withdraw">$%.2f доступно к выводу</string>
+    <string name="worker_available_to_withdraw">%.2f ₽ доступно к выводу</string>
     <string name="worker_stats_title">Ваша статистика</string>
     <string name="worker_stats_completed">Выполнено</string>
     <string name="worker_stats_success_rate">Успешность</string>
     <string name="worker_stats_rating">Рейтинг</string>
+
+    <!-- Auth Required -->
+    <string name="auth_required_title">Войдите в аккаунт</string>
+    <string name="auth_required_general">Для использования всех функций требуется авторизация</string>
+    <string name="auth_required_schedule">Для планирования постов требуется авторизация</string>
+    <string name="auth_required_ai">Для генерации AI подписей требуется авторизация</string>
+    <string name="auth_required_worker">Для режима заработка требуется авторизация</string>
+    <string name="auth_login_via_website">Войти через сайт</string>
+    <string name="auth_later">Позже</string>
+    <string name="auth_session_expired">Сессия истекла. Войдите заново.</string>
+    <string name="auth_login_success">Вход выполнен!</string>
+    <string name="error_auth_required_for_schedule">Войдите в аккаунт для планирования постов</string>
+    <string name="error_select_video">Выберите видео</string>
+    <string name="error_select_future_time">Выберите время в будущем</string>
+    <string name="error_select_videos_first">Сначала выберите видео</string>
+    <string name="error_schedule_not_generated">Расписание не сгенерировано</string>
+    <string name="error_slots_in_past">%d слотов запланированы в прошлом. Обновите расписание.</string>
+    <string name="error_failed_create_post">Не удалось создать пост</string>
+    <string name="error_failed_schedule_videos">Не удалось запланировать видео</string>
 </resources>

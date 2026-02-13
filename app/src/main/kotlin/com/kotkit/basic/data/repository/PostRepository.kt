@@ -121,4 +121,12 @@ class PostRepository @Inject constructor(
     suspend fun getFailedCount(): Int = postDao.countByStatus(PostStatus.FAILED)
 
     fun getTotalCount(): Flow<Int> = postDao.countAllFlow()
+
+    /**
+     * Recover posts stuck in POSTING status after app crash.
+     * Posts that have been POSTING since before [cutoffTime] are marked as FAILED.
+     */
+    suspend fun recoverStuckPostingPosts(cutoffTime: Long) {
+        postDao.recoverStuckPostingPosts(cutoffTime)
+    }
 }

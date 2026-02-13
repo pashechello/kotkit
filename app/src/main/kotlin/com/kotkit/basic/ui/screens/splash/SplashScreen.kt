@@ -1,6 +1,5 @@
 package com.kotkit.basic.ui.screens.splash
 
-import android.media.MediaPlayer
 import android.net.Uri
 import android.util.Log
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
@@ -162,9 +161,6 @@ fun SplashScreen(
         }
     }
 
-    // Meow sound state
-    var meowPlayed by remember { mutableStateOf(false) }
-
     // Listen for video playback events
     DisposableEffect(exoPlayer) {
         val listener = object : Player.Listener {
@@ -184,49 +180,6 @@ fun SplashScreen(
         onDispose {
             exoPlayer.removeListener(listener)
             exoPlayer.release()
-        }
-    }
-
-    // Track video position to play meow near the end
-    LaunchedEffect(exoPlayer) {
-        // Wait for video to be ready and get duration
-        while (exoPlayer.duration <= 0) {
-            delay(50)
-        }
-
-        val totalDuration = exoPlayer.duration
-        Log.d("SplashScreen", "Video duration: $totalDuration ms")
-
-        // Calculate when to play meow (1.5 seconds before end, or at 50% for short videos)
-        val meowTriggerTime = if (totalDuration > 3000) {
-            totalDuration - 1500
-        } else {
-            totalDuration / 2  // For short videos, play at 50%
-        }
-        Log.d("SplashScreen", "Will play meow at position: $meowTriggerTime ms")
-
-        while (!meowPlayed && exoPlayer.playbackState != Player.STATE_ENDED) {
-            delay(50)
-            val position = exoPlayer.currentPosition
-
-            if (position >= meowTriggerTime) {
-                Log.d("SplashScreen", "Playing meow at position: $position ms")
-                try {
-                    // Create and play sound directly
-                    MediaPlayer.create(context, R.raw.meow_ui)?.apply {
-                        setVolume(0.8f, 0.8f)
-                        setOnCompletionListener { mp ->
-                            Log.d("SplashScreen", "Meow completed")
-                            mp.release()
-                        }
-                        start()
-                        Log.d("SplashScreen", "Meow started successfully!")
-                    } ?: Log.e("SplashScreen", "Failed to create MediaPlayer!")
-                } catch (e: Exception) {
-                    Log.e("SplashScreen", "Error playing meow", e)
-                }
-                meowPlayed = true
-            }
         }
     }
 

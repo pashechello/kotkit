@@ -1,3 +1,25 @@
+# Logging in KotKit
+
+## Quick Reference (ADB)
+
+```bash
+# Read today's logs directly from device
+adb shell "cat /sdcard/Android/data/com.kotkit.basic/files/logs/kotkit_$(date +%Y-%m-%d).log"
+
+# Last 100 lines
+adb shell "cat /sdcard/Android/data/com.kotkit.basic/files/logs/kotkit_$(date +%Y-%m-%d).log" | tail -100
+
+# Filter by keyword
+adb shell "cat /sdcard/Android/data/com.kotkit.basic/files/logs/kotkit_$(date +%Y-%m-%d).log" | grep -i "caption"
+
+# Pull all logs to local machine
+adb pull /sdcard/Android/data/com.kotkit.basic/files/logs/ ./logs/
+```
+
+Key tags: `NewPostVM`, `PostingAgent`, `TokenAuthenticator`, `RetryInterceptor`, `PostWorker`
+
+---
+
 # Логирование в KotKit
 
 ## Обзор

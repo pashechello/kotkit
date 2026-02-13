@@ -92,4 +92,32 @@ class AuthRepository @Inject constructor(
     }
 
     fun getUserId(): String? = encryptedPreferences.userId
+
+    /**
+     * Get cached user email (stored locally).
+     */
+    fun getCachedEmail(): String? = encryptedPreferences.userEmail
+
+    /**
+     * Get user profile (email, name) from server.
+     * Also caches email locally for offline access.
+     */
+    suspend fun getProfile(): Result<UserProfile> {
+        return try {
+            val response = apiService.getProfile()
+            // Cache email locally
+            encryptedPreferences.userEmail = response.email
+            Result.success(UserProfile(
+                email = response.email,
+                name = response.name
+            ))
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }
+
+data class UserProfile(
+    val email: String,
+    val name: String?
+)

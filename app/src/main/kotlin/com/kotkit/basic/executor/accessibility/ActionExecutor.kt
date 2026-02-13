@@ -21,34 +21,80 @@ class ActionExecutor @Inject constructor(
 
     private val humanizer = BasicHumanizer()
 
-    suspend fun execute(action: AnalyzeResponse): ExecutionResult {
+    /**
+     * Execute action with optional cancellation check.
+     * @param action The action to execute
+     * @param isCancelled Function to check if operation was cancelled (optional)
+     */
+    suspend fun execute(
+        action: AnalyzeResponse,
+        isCancelled: (() -> Boolean)? = null
+    ): ExecutionResult {
         val service = TikTokAccessibilityService.getInstance()
             ?: return ExecutionResult.Error("Accessibility service not available", recoverable = true)
 
-        // Add human-like pre-action delay
+        // Check cancellation before starting
+        if (isCancelled?.invoke() == true) {
+            return ExecutionResult.Cancelled
+        }
+
+        // Add human-like pre-action delay (cancellable)
         val preDelay = humanizer.generatePreActionDelay()
-        delay(preDelay)
+        if (!cancellableDelay(preDelay, isCancelled)) {
+            return ExecutionResult.Cancelled
+        }
 
         val result = when (action.action) {
             ActionType.TAP -> executeTap(service, action)
             ActionType.SWIPE -> executeSwipe(service, action)
             ActionType.TYPE_TEXT, ActionType.TYPE -> executeType(service, action)
-            ActionType.WAIT -> executeWait(action)
+            ActionType.WAIT -> executeWait(action, isCancelled)
             ActionType.BACK -> executeBack(service, action)
-            ActionType.LAUNCH_TIKTOK, ActionType.OPEN_APP -> executeLaunchTikTok(action)
+            // NOTE: LAUNCH_TIKTOK removed - Share Intent is the only supported flow
             ActionType.DISMISS_POPUP -> executeDismissPopup(service, action)
+            ActionType.NAVIGATE_TO_FEED -> executeNavigateToFeed(service)
             ActionType.FINISH, ActionType.DONE -> ExecutionResult.Done(action.message)
             ActionType.ERROR -> ExecutionResult.Error(action.message, action.recoverable ?: false)
             else -> ExecutionResult.Error("Unknown action: ${action.action}", recoverable = false)
         }
 
+        // Check cancellation after action
+        if (isCancelled?.invoke() == true) {
+            return ExecutionResult.Cancelled
+        }
+
         // Add human-like post-action delay (unless it's a terminal state)
-        if (result !is ExecutionResult.Done && result !is ExecutionResult.Error) {
+        if (result !is ExecutionResult.Done && result !is ExecutionResult.Error && result !is ExecutionResult.Cancelled) {
             val postDelay = action.waitAfter?.toLong() ?: humanizer.generatePostActionDelay()
-            delay(postDelay)
+            if (!cancellableDelay(postDelay, isCancelled)) {
+                return ExecutionResult.Cancelled
+            }
         }
 
         return result
+    }
+
+    /**
+     * Cancellable delay - checks isCancelled every 100ms.
+     * @return true if completed, false if cancelled
+     */
+    private suspend fun cancellableDelay(
+        durationMs: Long,
+        isCancelled: (() -> Boolean)?
+    ): Boolean {
+        if (isCancelled == null) {
+            delay(durationMs)
+            return true
+        }
+
+        val iterations = (durationMs / 100).toInt()
+        repeat(iterations) {
+            if (isCancelled()) return false
+            delay(100)
+        }
+        val remaining = durationMs % 100
+        if (remaining > 0) delay(remaining)
+        return !isCancelled()
     }
 
     private suspend fun executeTap(
@@ -134,11 +180,17 @@ class ActionExecutor @Inject constructor(
         return if (success) ExecutionResult.Success else ExecutionResult.Failed("Type failed")
     }
 
-    private suspend fun executeWait(action: AnalyzeResponse): ExecutionResult {
+    private suspend fun executeWait(
+        action: AnalyzeResponse,
+        isCancelled: (() -> Boolean)?
+    ): ExecutionResult {
         val duration = action.duration?.toLong() ?: action.waitAfter?.toLong() ?: 1000L
         Timber.tag(TAG).d("Wait: ${duration}ms")
-        delay(duration)
-        return ExecutionResult.Success
+        return if (cancellableDelay(duration, isCancelled)) {
+            ExecutionResult.Success
+        } else {
+            ExecutionResult.Cancelled
+        }
     }
 
     private suspend fun executeBack(
@@ -150,26 +202,16 @@ class ActionExecutor @Inject constructor(
         return if (success) ExecutionResult.Success else ExecutionResult.Failed("Back press failed")
     }
 
-    private suspend fun executeLaunchTikTok(action: AnalyzeResponse): ExecutionResult {
-        val packageName = action.packageName ?: "com.zhiliaoapp.musically"
+    // NOTE: executeLaunchTikTok() REMOVED - Share Intent is the only supported flow
 
-        Timber.tag(TAG).d("Launch TikTok: $packageName")
-
-        val intent = context.packageManager.getLaunchIntentForPackage(packageName)
-        if (intent == null) {
-            // Try TikTok Lite as fallback
-            val liteIntent = context.packageManager.getLaunchIntentForPackage("com.ss.android.ugc.trill")
-            if (liteIntent == null) {
-                return ExecutionResult.Failed("TikTok not found")
-            }
-            liteIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            context.startActivity(liteIntent)
-        } else {
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            context.startActivity(intent)
+    private suspend fun executeNavigateToFeed(
+        service: TikTokAccessibilityService
+    ): ExecutionResult {
+        Timber.tag(TAG).d("Navigate to feed: pressing BACK up to 3 times")
+        repeat(3) {
+            service.pressBack()
+            delay(500)
         }
-
-        delay(500L)  // Reduced from 2000ms - just enough for activity to start
         return ExecutionResult.Success
     }
 
@@ -200,6 +242,7 @@ class ActionExecutor @Inject constructor(
 sealed class ExecutionResult {
     object Success : ExecutionResult()
     object PublishTapped : ExecutionResult()  // Publish button was tapped, need Feed verification
+    object Cancelled : ExecutionResult()  // User cancelled the operation
     data class Done(val message: String?) : ExecutionResult()
     data class Failed(val reason: String) : ExecutionResult()
     data class Error(val message: String?, val recoverable: Boolean) : ExecutionResult()

@@ -1,6 +1,10 @@
 package com.kotkit.basic.data.repository
 
+import android.content.Context
+import android.os.Build
+import android.provider.Settings
 import android.util.Log
+import com.kotkit.basic.BuildConfig
 import com.kotkit.basic.data.local.db.WorkerEarningDao
 import com.kotkit.basic.data.local.db.WorkerProfileDao
 import com.kotkit.basic.data.local.db.entities.WorkerEarningEntity
@@ -14,18 +18,45 @@ import com.kotkit.basic.data.remote.api.models.WorkerRegisterRequest
 import com.kotkit.basic.data.remote.api.models.WorkerResponse
 import com.kotkit.basic.data.remote.api.models.WorkerStatsResponse
 import com.kotkit.basic.data.remote.api.models.WorkerToggleRequest
+import com.kotkit.basic.data.remote.api.models.WorkerUpdateRequest
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class WorkerRepository @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val workerProfileDao: WorkerProfileDao,
     private val workerEarningDao: WorkerEarningDao,
     private val apiService: ApiService
 ) {
     companion object {
         private const val TAG = "WorkerRepository"
+    }
+
+    // Timestamp of the last toggle operation - any profile fetch that started
+    // BEFORE this timestamp should be ignored to prevent race conditions
+    private val lastToggleTimestamp = AtomicLong(0L)
+
+    /**
+     * Insert profile only if it's not stale (operation started after last toggle).
+     * Returns true if inserted, false if skipped.
+     */
+    private suspend fun insertProfileIfNotStale(
+        entity: WorkerProfileEntity,
+        operationStartTime: Long
+    ): Boolean {
+        val toggleTime = lastToggleTimestamp.get()
+        if (operationStartTime < toggleTime) {
+            Log.w(TAG, "Skipping stale profile insert: opTime=$operationStartTime < toggleTime=$toggleTime, isActive=${entity.isActive}")
+            return false
+        }
+        workerProfileDao.insert(entity)
+        return true
     }
 
     // ========================================================================
@@ -74,11 +105,20 @@ class WorkerRepository @Inject constructor(
     }
 
     suspend fun fetchAndSyncProfile(): Result<WorkerProfileEntity> {
+        val fetchStartTime = System.currentTimeMillis()
         return try {
+            Log.i(TAG, "Fetching profile from API... (startTime=$fetchStartTime)")
             val response = apiService.getWorkerProfile()
+            Log.i(TAG, "Profile API response: is_active=${response.isActive}, id=${response.id}")
             val entity = response.toEntity()
-            workerProfileDao.insert(entity)
-            Log.i(TAG, "Profile synced: ${entity.id}")
+
+            val inserted = insertProfileIfNotStale(entity, fetchStartTime)
+            if (inserted) {
+                Log.i(TAG, "Profile synced to DB: isActive=${entity.isActive}")
+            } else {
+                Log.i(TAG, "Profile sync SKIPPED (stale): isActive=${entity.isActive}")
+            }
+
             Result.success(entity)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to fetch profile", e)
@@ -86,12 +126,45 @@ class WorkerRepository @Inject constructor(
         }
     }
 
-    suspend fun toggleWorkerMode(isActive: Boolean): Result<WorkerProfileEntity> {
+    suspend fun updateTiktokUsername(username: String): Result<WorkerProfileEntity> {
         return try {
-            val response = apiService.toggleWorkerMode(WorkerToggleRequest(isActive))
+            val response = apiService.updateWorkerProfile(
+                WorkerUpdateRequest(
+                    tiktokUsername = username,
+                    categoryIds = null,
+                    maxDailyTasks = null,
+                    minPricePerPost = null,
+                    isActive = null,
+                    countryCode = null,
+                    timezone = null
+                )
+            )
             val entity = response.toEntity()
             workerProfileDao.insert(entity)
-            Log.i(TAG, "Worker mode toggled: isActive=$isActive")
+            Log.i(TAG, "TikTok username updated: @$username")
+            Result.success(entity)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to update TikTok username", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun toggleWorkerMode(isActive: Boolean): Result<WorkerProfileEntity> {
+        val toggleStartTime = System.currentTimeMillis()
+        // Mark this toggle time - any fetch that started before this is stale
+        lastToggleTimestamp.set(toggleStartTime)
+
+        return try {
+            val request = WorkerToggleRequest(isActive)
+            Log.i(TAG, "Toggle API call: requesting isActive=$isActive (toggleTime=$toggleStartTime)")
+            val response = apiService.toggleWorkerMode(request)
+            Log.i(TAG, "Toggle API response: is_active=${response.isActive}, requested=$isActive, match=${response.isActive == isActive}")
+            val entity = response.toEntity()
+
+            // Toggle response is always authoritative - no stale check needed
+            workerProfileDao.insert(entity)
+            Log.i(TAG, "Toggle saved to DB: isActive=${entity.isActive}")
+
             Result.success(entity)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to toggle worker mode", e)
@@ -199,11 +272,55 @@ class WorkerRepository @Inject constructor(
     }
 
     // ========================================================================
+    // Worker Heartbeat (Worker-level, not Task-level)
+    // ========================================================================
+
+    /**
+     * Send worker-level heartbeat to backend.
+     *
+     * This indicates the worker is alive and available for tasks,
+     * independent of whether they have any active tasks.
+     * Should be called every 5 minutes while worker mode is active.
+     */
+    suspend fun sendWorkerHeartbeat(): Result<Unit> {
+        return try {
+            val response = apiService.workerHeartbeat()
+            if (response.ok) {
+                Log.d(TAG, "Worker heartbeat sent, last_active_at=${response.lastActiveAt}")
+                Result.success(Unit)
+            } else {
+                Log.w(TAG, "Worker heartbeat returned ok=false")
+                Result.failure(Exception("Heartbeat failed"))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to send worker heartbeat", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Notify backend that worker is going offline.
+     *
+     * Best-effort call when app is being closed.
+     * Not guaranteed to complete (Android may kill process).
+     */
+    suspend fun sendWorkerOffline(): Result<Unit> {
+        return try {
+            val response = apiService.workerOffline()
+            Log.i(TAG, "Worker offline notification sent")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to send offline notification (expected)", e)
+            Result.failure(e)
+        }
+    }
+
+    // ========================================================================
     // Payouts
     // ========================================================================
 
     suspend fun requestPayout(
-        amountUsd: Float,
+        amountRub: Float,
         method: String,
         currency: String,
         walletAddress: String
@@ -211,13 +328,13 @@ class WorkerRepository @Inject constructor(
         return try {
             val response = apiService.requestPayout(
                 PayoutRequestCreate(
-                    amountUsd = amountUsd,
+                    amountRub = amountRub,
                     method = method,
                     currency = currency,
                     walletAddress = walletAddress
                 )
             )
-            Log.i(TAG, "Payout requested: $amountUsd via $method")
+            Log.i(TAG, "Payout requested: $amountRub via $method")
             Result.success(response)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to request payout", e)
@@ -226,8 +343,44 @@ class WorkerRepository @Inject constructor(
     }
 
     // ========================================================================
+    // FCM Device Registration
+    // ========================================================================
+
+    /**
+     * Register FCM token with backend.
+     */
+    suspend fun registerDeviceToken(fcmToken: String): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                val request = RegisterDeviceRequest(
+                    deviceFingerprint = getDeviceFingerprint(),
+                    deviceModel = Build.MODEL,
+                    androidVersion = Build.VERSION.RELEASE,
+                    appVersion = BuildConfig.VERSION_NAME,
+                    fcmToken = fcmToken
+                )
+
+                val response = apiService.registerDevice(request)
+                Log.i(TAG, "FCM token registered: ${response.id}")
+                true
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to register FCM token", e)
+                false
+            }
+        }
+    }
+
+    // ========================================================================
     // Helpers
     // ========================================================================
+
+    private fun getDeviceFingerprint(): String {
+        val androidId = Settings.Secure.getString(
+            context.contentResolver,
+            Settings.Secure.ANDROID_ID
+        )
+        return "${Build.MODEL}_${androidId}"
+    }
 
     private fun WorkerResponse.toEntity(): WorkerProfileEntity {
         return WorkerProfileEntity(
@@ -242,9 +395,9 @@ class WorkerRepository @Inject constructor(
             completedTasks = completedTasks,
             failedTasks = failedTasks,
             successRate = successRate,
-            totalEarnedUsd = totalEarned,
-            pendingBalanceUsd = pendingBalance,
-            availableBalanceUsd = availableBalance,
+            totalEarnedRub = totalEarned,
+            pendingBalanceRub = pendingBalance,
+            availableBalanceRub = availableBalance,
             minPricePerPost = minPricePerPost,
             createdAt = createdAt,
             lastSyncedAt = System.currentTimeMillis()
@@ -256,7 +409,7 @@ class WorkerRepository @Inject constructor(
             id = id,
             taskId = taskId,
             campaignId = campaignId,
-            amountUsd = amountUsd,
+            amountRub = amountRub,
             status = status,
             createdAt = createdAt,
             approvedAt = approvedAt,

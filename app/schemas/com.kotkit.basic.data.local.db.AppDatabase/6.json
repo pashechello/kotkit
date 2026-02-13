@@ -1,0 +1,595 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 6,
+    "identityHash": "f1d7a87f338d9da659557027af9be833",
+    "entities": [
+      {
+        "tableName": "posts",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `videoPath` TEXT NOT NULL, `thumbnailPath` TEXT, `caption` TEXT NOT NULL, `scheduledTime` INTEGER NOT NULL, `status` TEXT NOT NULL, `errorMessage` TEXT, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "videoPath",
+            "columnName": "videoPath",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "thumbnailPath",
+            "columnName": "thumbnailPath",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "caption",
+            "columnName": "caption",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "scheduledTime",
+            "columnName": "scheduledTime",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "errorMessage",
+            "columnName": "errorMessage",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "accounts",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `username` TEXT NOT NULL, `email` TEXT, `isActive` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "username",
+            "columnName": "username",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "email",
+            "columnName": "email",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "isActive",
+            "columnName": "isActive",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "network_tasks",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `campaignId` TEXT NOT NULL, `videoS3Key` TEXT NOT NULL, `videoHash` TEXT, `videoSizeBytes` INTEGER, `caption` TEXT, `status` TEXT NOT NULL, `priceRub` REAL NOT NULL, `assignedAt` INTEGER, `scheduledFor` INTEGER, `lastHeartbeat` INTEGER, `startedAt` INTEGER, `completedAt` INTEGER, `tiktokVideoId` TEXT, `tiktokPostUrl` TEXT, `proofScreenshotPath` TEXT, `errorMessage` TEXT, `errorType` TEXT, `retryCount` INTEGER NOT NULL, `videoLocalPath` TEXT, `downloadProgress` INTEGER NOT NULL, `syncStatus` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "campaignId",
+            "columnName": "campaignId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "videoS3Key",
+            "columnName": "videoS3Key",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "videoHash",
+            "columnName": "videoHash",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "videoSizeBytes",
+            "columnName": "videoSizeBytes",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "caption",
+            "columnName": "caption",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "priceRub",
+            "columnName": "priceRub",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "assignedAt",
+            "columnName": "assignedAt",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "scheduledFor",
+            "columnName": "scheduledFor",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "lastHeartbeat",
+            "columnName": "lastHeartbeat",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "startedAt",
+            "columnName": "startedAt",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "completedAt",
+            "columnName": "completedAt",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "tiktokVideoId",
+            "columnName": "tiktokVideoId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "tiktokPostUrl",
+            "columnName": "tiktokPostUrl",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "proofScreenshotPath",
+            "columnName": "proofScreenshotPath",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "errorMessage",
+            "columnName": "errorMessage",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "errorType",
+            "columnName": "errorType",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "retryCount",
+            "columnName": "retryCount",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "videoLocalPath",
+            "columnName": "videoLocalPath",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "downloadProgress",
+            "columnName": "downloadProgress",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncStatus",
+            "columnName": "syncStatus",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_network_tasks_status",
+            "unique": false,
+            "columnNames": [
+              "status"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_network_tasks_status` ON `${TABLE_NAME}` (`status`)"
+          },
+          {
+            "name": "index_network_tasks_syncStatus",
+            "unique": false,
+            "columnNames": [
+              "syncStatus"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_network_tasks_syncStatus` ON `${TABLE_NAME}` (`syncStatus`)"
+          },
+          {
+            "name": "index_network_tasks_scheduledFor",
+            "unique": false,
+            "columnNames": [
+              "scheduledFor"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_network_tasks_scheduledFor` ON `${TABLE_NAME}` (`scheduledFor`)"
+          }
+        ],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "worker_profile",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `userId` TEXT NOT NULL, `tiktokUsername` TEXT, `followersCount` INTEGER NOT NULL, `isActive` INTEGER NOT NULL, `isVerified` INTEGER NOT NULL, `rating` REAL NOT NULL, `totalTasks` INTEGER NOT NULL, `completedTasks` INTEGER NOT NULL, `failedTasks` INTEGER NOT NULL, `successRate` REAL NOT NULL, `totalEarnedRub` REAL NOT NULL, `pendingBalanceRub` REAL NOT NULL, `availableBalanceRub` REAL NOT NULL, `minPricePerPost` REAL NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `lastSyncedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "userId",
+            "columnName": "userId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tiktokUsername",
+            "columnName": "tiktokUsername",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "followersCount",
+            "columnName": "followersCount",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isActive",
+            "columnName": "isActive",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isVerified",
+            "columnName": "isVerified",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "rating",
+            "columnName": "rating",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "totalTasks",
+            "columnName": "totalTasks",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "completedTasks",
+            "columnName": "completedTasks",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "failedTasks",
+            "columnName": "failedTasks",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "successRate",
+            "columnName": "successRate",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "totalEarnedRub",
+            "columnName": "totalEarnedRub",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "pendingBalanceRub",
+            "columnName": "pendingBalanceRub",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "availableBalanceRub",
+            "columnName": "availableBalanceRub",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "minPricePerPost",
+            "columnName": "minPricePerPost",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastSyncedAt",
+            "columnName": "lastSyncedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "worker_earnings",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `taskId` TEXT NOT NULL, `campaignId` TEXT NOT NULL, `amountRub` REAL NOT NULL, `status` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `approvedAt` INTEGER, `paidAt` INTEGER, `lastSyncedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "taskId",
+            "columnName": "taskId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "campaignId",
+            "columnName": "campaignId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "amountRub",
+            "columnName": "amountRub",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "approvedAt",
+            "columnName": "approvedAt",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "paidAt",
+            "columnName": "paidAt",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "lastSyncedAt",
+            "columnName": "lastSyncedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_worker_earnings_status",
+            "unique": false,
+            "columnNames": [
+              "status"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_worker_earnings_status` ON `${TABLE_NAME}` (`status`)"
+          },
+          {
+            "name": "index_worker_earnings_createdAt",
+            "unique": false,
+            "columnNames": [
+              "createdAt"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_worker_earnings_createdAt` ON `${TABLE_NAME}` (`createdAt`)"
+          }
+        ],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "selectors_config",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `version` TEXT NOT NULL, `updatedAt` INTEGER NOT NULL, `selectorsJson` TEXT NOT NULL, `contentDescriptionsJson` TEXT NOT NULL, `pageLoadMs` INTEGER NOT NULL, `elementWaitMs` INTEGER NOT NULL, `uploadTimeoutMs` INTEGER NOT NULL, `postConfirmMs` INTEGER NOT NULL, `fetchedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "version",
+            "columnName": "version",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "selectorsJson",
+            "columnName": "selectorsJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "contentDescriptionsJson",
+            "columnName": "contentDescriptionsJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "pageLoadMs",
+            "columnName": "pageLoadMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "elementWaitMs",
+            "columnName": "elementWaitMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "uploadTimeoutMs",
+            "columnName": "uploadTimeoutMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "postConfirmMs",
+            "columnName": "postConfirmMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fetchedAt",
+            "columnName": "fetchedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      }
+    ],
+    "views": [],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'f1d7a87f338d9da659557027af9be833')"
+    ]
+  }
+}

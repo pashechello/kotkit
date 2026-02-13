@@ -47,9 +47,9 @@ interface WorkerProfileDao {
 
     @Query("""
         UPDATE worker_profile
-        SET totalEarnedUsd = :totalEarned,
-            pendingBalanceUsd = :pending,
-            availableBalanceUsd = :available,
+        SET totalEarnedRub = :totalEarned,
+            pendingBalanceRub = :pending,
+            availableBalanceRub = :available,
             updatedAt = :time
         WHERE id = :id
     """)

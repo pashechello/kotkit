@@ -84,10 +84,11 @@ class App : Application(), Configuration.Provider {
                 .build()
 
             // Posting channel - shown during active posting
+            // IMPORTANCE_DEFAULT required for action buttons to be visible on some OEMs (Samsung, Xiaomi)
             val postingChannel = NotificationChannel(
                 CHANNEL_POSTING,
                 "Posting Status",
-                NotificationManager.IMPORTANCE_LOW
+                NotificationManager.IMPORTANCE_DEFAULT
             ).apply {
                 description = "Shows status while posting to TikTok"
                 setShowBadge(false)

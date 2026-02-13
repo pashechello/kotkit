@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.*
@@ -36,6 +37,7 @@ fun PostCard(
     onClick: () -> Unit,
     onDelete: () -> Unit,
     onReschedule: () -> Unit,
+    onStop: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var showMenu by remember { mutableStateOf(false) }
@@ -128,8 +130,50 @@ fun PostCard(
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
                 Column {
-                    // Status badge
-                    StatusBadge(status = post.status)
+                    // Status badge with Stop button when posting
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        StatusBadge(
+                            status = post.status,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+
+                        // Stop button - only visible when posting
+                        if (post.status == PostStatus.POSTING) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(
+                                        Brush.linearGradient(
+                                            listOf(StatusFailed, StatusFailed.copy(alpha = 0.8f))
+                                        )
+                                    )
+                                    .clickable(onClick = onStop)
+                                    .padding(horizontal = 8.dp, vertical = 5.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Stop,
+                                        contentDescription = "Остановить",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(12.dp)
+                                    )
+                                    Text(
+                                        text = "Стоп",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Color.White
+                                    )
+                                }
+                            }
+                        }
+                    }
 
                     Spacer(modifier = Modifier.height(10.dp))
 
@@ -138,7 +182,7 @@ fun PostCard(
                         text = post.caption.ifBlank { noCaptionText },
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium,
-                        maxLines = 3,
+                        maxLines = if (post.status == PostStatus.POSTING) 2 else 3,
                         overflow = TextOverflow.Ellipsis,
                         color = MaterialTheme.colorScheme.onSurface
                     )
@@ -202,53 +246,69 @@ fun PostCard(
                     expanded = showMenu,
                     onDismissRequest = { showMenu = false },
                     modifier = Modifier
-                        .background(MaterialTheme.colorScheme.surface)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(SurfaceDialog)
                 ) {
                     if (post.status == PostStatus.SCHEDULED || post.status == PostStatus.FAILED) {
-                        DropdownMenuItem(
-                            text = {
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Refresh,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(18.dp),
-                                        tint = MaterialTheme.colorScheme.primary
-                                    )
-                                    Text(stringResource(R.string.action_reschedule))
+                        // Кнопка "Перенести"
+                        Box(
+                            modifier = Modifier
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(BrandCyan.copy(alpha = 0.1f))
+                                .clickable {
+                                    showMenu = false
+                                    onReschedule()
                                 }
-                            },
-                            onClick = {
-                                showMenu = false
-                                onReschedule()
-                            }
-                        )
-                    }
-                    DropdownMenuItem(
-                        text = {
+                                .padding(horizontal = 16.dp, vertical = 12.dp)
+                        ) {
                             Row(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
-                                    imageVector = Icons.Outlined.Delete,
+                                    imageVector = Icons.Outlined.Refresh,
                                     contentDescription = null,
-                                    modifier = Modifier.size(18.dp),
-                                    tint = StatusFailed
+                                    modifier = Modifier.size(20.dp),
+                                    tint = BrandCyan
                                 )
                                 Text(
-                                    stringResource(R.string.action_delete),
-                                    color = StatusFailed
+                                    stringResource(R.string.action_reschedule),
+                                    color = TextPrimary,
+                                    style = MaterialTheme.typography.bodyMedium
                                 )
                             }
-                        },
-                        onClick = {
-                            showMenu = false
-                            onDelete()
                         }
-                    )
+                    }
+                    // Кнопка "Удалить"
+                    Box(
+                        modifier = Modifier
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(StatusFailed.copy(alpha = 0.1f))
+                            .clickable {
+                                showMenu = false
+                                onDelete()
+                            }
+                            .padding(horizontal = 16.dp, vertical = 12.dp)
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Delete,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp),
+                                tint = StatusFailed
+                            )
+                            Text(
+                                stringResource(R.string.action_delete),
+                                color = StatusFailed,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                    }
                 }
             }
         }

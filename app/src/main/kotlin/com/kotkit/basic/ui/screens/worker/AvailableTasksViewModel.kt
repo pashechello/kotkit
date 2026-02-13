@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.kotkit.basic.data.remote.api.models.TaskResponse
 import com.kotkit.basic.data.repository.NetworkTaskRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import com.kotkit.basic.data.remote.api.userErrorMessage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -39,7 +40,7 @@ class AvailableTasksViewModel @Inject constructor(
             } else {
                 _uiState.update {
                     it.copy(
-                        error = result.exceptionOrNull()?.message ?: "Не удалось загрузить задачи",
+                        error = result.userErrorMessage("Не удалось загрузить задачи"),
                         isLoading = false
                     )
                 }
@@ -62,7 +63,7 @@ class AvailableTasksViewModel @Inject constructor(
             } else {
                 _uiState.update {
                     it.copy(
-                        error = result.exceptionOrNull()?.message,
+                        error = result.userErrorMessage(),
                         isRefreshing = false
                     )
                 }
@@ -87,7 +88,7 @@ class AvailableTasksViewModel @Inject constructor(
             } else {
                 _uiState.update {
                     it.copy(
-                        error = result.exceptionOrNull()?.message ?: "Не удалось взять задачу",
+                        error = result.userErrorMessage("Не удалось взять задачу"),
                         claimingTaskId = null
                     )
                 }

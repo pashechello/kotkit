@@ -28,6 +28,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.kotkit.basic.R
 import com.kotkit.basic.ui.components.BounceOverscrollContainer
 import com.kotkit.basic.ui.components.GradientButton
+import com.kotkit.basic.ui.components.GradientFAB
 import com.kotkit.basic.ui.components.PostCard
 import com.kotkit.basic.ui.theme.*
 
@@ -64,25 +65,40 @@ fun QueueScreen(
                     GlassEmptyState(onCreatePost = onNavigateToNewPost)
                 }
             } else {
-                BounceOverscrollContainer(modifier = Modifier.fillMaxSize()) {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(
-                            start = 16.dp,
-                            end = 16.dp,
-                            top = 16.dp,
-                            bottom = 100.dp
-                        ),
-                        verticalArrangement = Arrangement.spacedBy(14.dp)
-                    ) {
-                        items(posts, key = { it.id }) { post ->
-                            PostCard(
-                                post = post,
-                                onClick = {},
-                                onDelete = { viewModel.deletePost(post.id) },
-                                onReschedule = {}
-                            )
+                Box(modifier = Modifier.fillMaxSize()) {
+                    BounceOverscrollContainer(modifier = Modifier.fillMaxSize()) {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(
+                                start = 16.dp,
+                                end = 16.dp,
+                                top = 16.dp,
+                                bottom = 100.dp
+                            ),
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            items(posts, key = { it.id }) { post ->
+                                PostCard(
+                                    post = post,
+                                    onClick = {},
+                                    onDelete = { viewModel.deletePost(post.id) },
+                                    onReschedule = {}
+                                )
+                            }
                         }
+                    }
+
+                    // FAB для создания нового поста
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(16.dp)
+                            .navigationBarsPadding()
+                    ) {
+                        GradientFAB(
+                            onClick = onNavigateToNewPost,
+                            contentDescription = stringResource(R.string.action_new_post)
+                        )
                     }
                 }
             }
@@ -146,7 +162,7 @@ private fun GlassTopBar(
                     )
                     if (postCount > 0) {
                         Text(
-                            text = "$postCount scheduled",
+                            text = stringResource(R.string.queue_count_scheduled, postCount),
                             style = MaterialTheme.typography.bodySmall,
                             color = BrandCyan
                         )
@@ -154,26 +170,6 @@ private fun GlassTopBar(
                 }
             }
 
-            // Post count badge
-            if (postCount > 0) {
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(
-                            brush = Brush.linearGradient(
-                                colors = listOf(BrandCyan, BrandPink)
-                            )
-                        )
-                        .padding(horizontal = 14.dp, vertical = 8.dp)
-                ) {
-                    Text(
-                        text = postCount.toString(),
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary
-                    )
-                }
-            }
         }
     }
 }

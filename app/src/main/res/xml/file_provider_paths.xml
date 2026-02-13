@@ -11,6 +11,11 @@
         name="temp_videos"
         path="videos/" />
 
+    <!-- Network mode downloaded videos -->
+    <files-path
+        name="network_videos"
+        path="network_videos/" />
+
     <!-- External files directory (for future expansion) -->
     <external-files-path
         name="external_videos"

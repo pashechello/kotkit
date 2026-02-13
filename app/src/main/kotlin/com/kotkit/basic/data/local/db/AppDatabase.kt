@@ -23,7 +23,7 @@ import com.kotkit.basic.data.local.db.entities.WorkerProfileEntity
         WorkerEarningEntity::class,
         SelectorsConfigEntity::class,
     ],
-    version = 4, // Added thumbnailPath to posts for persistent thumbnails
+    version = 7, // Add videoThumbnailUrl to NetworkTaskEntity
     exportSchema = true
 )
 @TypeConverters(Converters::class)

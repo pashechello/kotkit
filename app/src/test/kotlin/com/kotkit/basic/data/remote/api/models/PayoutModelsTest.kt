@@ -11,7 +11,7 @@ class PayoutModelsTest {
     @Test
     fun `card number is masked correctly in toString`() {
         val request = PayoutRequestCreate(
-            amountUsd = 100f,
+            amountRub = 100f,
             method = PayoutMethod.CARD,
             walletAddress = null,
             cardNumber = "4111111111111111",
@@ -27,7 +27,7 @@ class PayoutModelsTest {
     @Test
     fun `wallet address is masked correctly in toString`() {
         val request = PayoutRequestCreate(
-            amountUsd = 50f,
+            amountRub = 50f,
             method = PayoutMethod.CRYPTO,
             walletAddress = "0x1234567890abcdef1234567890abcdef12345678",
             cardNumber = null,
@@ -43,7 +43,7 @@ class PayoutModelsTest {
     @Test
     fun `phone number is masked correctly in toString`() {
         val request = PayoutRequestCreate(
-            amountUsd = 25f,
+            amountRub = 25f,
             method = PayoutMethod.SBP,
             walletAddress = null,
             cardNumber = null,
@@ -59,7 +59,7 @@ class PayoutModelsTest {
     @Test
     fun `short values are fully masked`() {
         val request = PayoutRequestCreate(
-            amountUsd = 10f,
+            amountRub = 10f,
             method = PayoutMethod.CARD,
             walletAddress = null,
             cardNumber = "1234", // Short card
@@ -75,7 +75,7 @@ class PayoutModelsTest {
     @Test
     fun `null values are handled gracefully`() {
         val request = PayoutRequestCreate(
-            amountUsd = 100f,
+            amountRub = 100f,
             method = PayoutMethod.CRYPTO,
             walletAddress = null,
             cardNumber = null,

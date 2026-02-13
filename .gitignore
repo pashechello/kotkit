@@ -36,6 +36,10 @@ secrets/
 .env
 .env.*
 
+# Firebase
+google-services.json
+app/google-services.json
+
 # macOS
 .DS_Store
 **/.DS_Store

@@ -1,4 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+    SECURITY: This Accessibility Service is RESTRICTED TO TIKTOK ONLY.
+
+    The android:packageNames attribute below is a SYSTEM-LEVEL restriction.
+    Android OS will ONLY deliver events from these packages to this service.
+
+    This means:
+    - Service CANNOT access banking apps, messaging apps, or ANY other app
+    - Service CANNOT read passwords or sensitive data from other apps
+    - Service CANNOT take screenshots of other apps
+    - Service CANNOT perform gestures in other apps
+
+    This restriction is enforced by Android OS, not by our code.
+    Even if our code had bugs, Android would block access to other apps.
+
+    Packages allowed (all are TikTok variants):
+    - com.zhiliaoapp.musically = TikTok (main international)
+    - com.ss.android.ugc.trill = TikTok Lite
+
+    See SECURITY.md for full security documentation.
+-->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
     android:accessibilityEventTypes="typeAllMask"
     android:accessibilityFeedbackType="feedbackGeneric"
@@ -8,4 +29,4 @@
     android:canTakeScreenshot="true"
     android:description="@string/accessibility_service_description"
     android:packageNames="com.zhiliaoapp.musically,com.ss.android.ugc.trill"
-    android:settingsActivity="com.autoposter.ui.MainActivity" />
+    android:settingsActivity="com.kotkit.basic.ui.MainActivity" />

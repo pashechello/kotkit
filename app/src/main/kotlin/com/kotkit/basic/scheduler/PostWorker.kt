@@ -5,6 +5,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.graphics.BitmapFactory
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import timber.log.Timber
@@ -61,10 +62,13 @@ class PostWorker @AssistedInject constructor(
         try {
             setForeground(createForegroundInfo(post.id, post.caption))
         } catch (e: ForegroundServiceStartNotAllowedException) {
-            Timber.tag(TAG).w("Cannot start foreground service from background, continuing without foreground notification", e)
-            // WorkManager will still execute the work, just without foreground notification
+            Timber.tag(TAG).w("Cannot start foreground service from background, using backup notification", e)
+            // Fallback: show regular notification with stop button
+            SchedulerNotifications.showStartingNotification(context, post.id)
         } catch (e: Exception) {
-            Timber.tag(TAG).w("Failed to set foreground info", e)
+            Timber.tag(TAG).w("Failed to set foreground info, using backup notification", e)
+            // Fallback: show regular notification with stop button
+            SchedulerNotifications.showStartingNotification(context, post.id)
         }
 
         // Update status to posting
@@ -171,6 +175,7 @@ class PostWorker @AssistedInject constructor(
         // Create stop action PendingIntent
         val stopIntent = Intent(context, StopPostingReceiver::class.java).apply {
             action = StopPostingReceiver.ACTION_STOP_POSTING
+            putExtra("post_id", postId)  // Pass postId to cancel notification
         }
         val stopPendingIntent = PendingIntent.getBroadcast(
             context,
@@ -179,13 +184,17 @@ class PostWorker @AssistedInject constructor(
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        // Cat-themed notification with stop button 🐱
+        val largeIcon = BitmapFactory.decodeResource(context.resources, R.drawable.logo)
         val notification = NotificationCompat.Builder(context, App.CHANNEL_POSTING)
-            .setContentTitle("Posting to TikTok")
-            .setContentText(caption.take(50) + if (caption.length > 50) "..." else "")
+            .setContentTitle("🚀 Поехали!")
+            .setContentText("Мур! Работаю над постом... 🐱")
             .setSmallIcon(R.drawable.ic_upload)
+            .setLargeIcon(largeIcon)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)  // Required for actions to show
             .setOngoing(true)
             .setProgress(0, 0, true)
-            .addAction(R.drawable.ic_cancel, "Остановить", stopPendingIntent)
+            .addAction(R.drawable.ic_cancel, "Остановить 🐾", stopPendingIntent)
             .build()
 
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {

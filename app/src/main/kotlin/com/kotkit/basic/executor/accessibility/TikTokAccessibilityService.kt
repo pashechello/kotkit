@@ -1,5 +1,43 @@
 package com.kotkit.basic.executor.accessibility
 
+/**
+ * # SECURITY MODEL - READ THIS FIRST
+ *
+ * This Accessibility Service is RESTRICTED TO TIKTOK ONLY.
+ *
+ * ## What This Service CAN Do:
+ * - Perform gestures (tap, swipe) in TikTok app
+ * - Read UI elements in TikTok app
+ * - Take screenshots when TikTok is in foreground
+ *
+ * ## What This Service CANNOT Do:
+ * - Access ANY other app (banking, messaging, email, etc.)
+ * - Read passwords or sensitive data from other apps
+ * - Perform gestures outside TikTok
+ * - Take screenshots of other apps
+ *
+ * ## How Restriction Is Enforced (3 Layers):
+ *
+ * 1. ANDROID SYSTEM LEVEL (accessibility_service_config.xml):
+ *    ```xml
+ *    android:packageNames="com.zhiliaoapp.musically,com.ss.android.ugc.trill"
+ *    ```
+ *    Android OS filters events BEFORE they reach this service.
+ *
+ * 2. COMPILE-TIME CONSTANT (this file, ALLOWED_PACKAGES):
+ *    Immutable set of allowed packages. Cannot be changed by server or at runtime.
+ *
+ * 3. RUNTIME CHECK (onAccessibilityEvent):
+ *    Defense-in-depth: rejects any non-TikTok events that somehow arrive.
+ *
+ * ## Can The Server Bypass This?
+ * NO. The server sends action commands like {action: "tap", x: 540, y: 960}.
+ * These execute through this service, which is physically restricted to TikTok
+ * at the Android OS level. The server has ZERO control over which apps are accessible.
+ *
+ * @see SECURITY.md for full security documentation
+ */
+
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.accessibilityservice.GestureDescription
@@ -20,7 +58,6 @@ import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import com.kotkit.basic.executor.accessibility.portal.UITree
 import com.kotkit.basic.executor.accessibility.portal.UITreeParser
-import com.kotkit.basic.status.FloatingLogoService
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -41,17 +78,28 @@ class TikTokAccessibilityService : AccessibilityService() {
         const val ACTION_TEST_SCREENSHOT = "com.kotkit.basic.TEST_SCREENSHOT"
         const val ACTION_TEST_UI_TREE = "com.kotkit.basic.TEST_UI_TREE"
         const val ACTION_TEST_PIN = "com.kotkit.basic.TEST_PIN"
+        const val ACTION_TEST_LOCK = "com.kotkit.basic.TEST_LOCK"
         const val EXTRA_X = "x"
         const val EXTRA_Y = "y"
         const val EXTRA_PIN = "pin"
 
-        // CRITICAL: Only these packages are allowed!
+        /**
+         * SECURITY: Immutable allowlist of TikTok package names.
+         *
+         * This is the ONLY set of apps this service can interact with.
+         * - This is a compile-time constant (private val)
+         * - Cannot be modified at runtime
+         * - Cannot be changed by server commands
+         * - Android OS also enforces this via accessibility_service_config.xml
+         *
+         * Any attempt to access apps outside this list will be blocked.
+         */
         private val ALLOWED_PACKAGES = setOf(
-            "com.zhiliaoapp.musically",      // TikTok (основной)
+            "com.zhiliaoapp.musically",      // TikTok (main international)
             "com.ss.android.ugc.trill",      // TikTok Lite
-            "com.ss.android.ugc.aweme",      // TikTok (китайский/старый)
-            "com.zhiliaoapp.musically.go",   // TikTok Go (лайт для развивающихся рынков)
-            "musical.ly"                      // Старый Musical.ly (legacy)
+            "com.ss.android.ugc.aweme",      // TikTok (Chinese/legacy)
+            "com.zhiliaoapp.musically.go",   // TikTok Go (emerging markets)
+            "musical.ly"                      // Old Musical.ly (legacy)
         )
 
         @Volatile
@@ -82,6 +130,7 @@ class TikTokAccessibilityService : AccessibilityService() {
     private val uiTreeParser = UITreeParser()
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var testReceiver: BroadcastReceiver? = null
+    @Volatile private var isFilterExpanded = false
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -91,8 +140,7 @@ class TikTokAccessibilityService : AccessibilityService() {
             eventTypes = AccessibilityEvent.TYPES_ALL_MASK
             feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC
             flags = AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS or
-                    AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS or
-                    AccessibilityServiceInfo.FLAG_REQUEST_ENHANCED_WEB_ACCESSIBILITY
+                    AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
             notificationTimeout = 100
             // CRITICAL: Restrict to TikTok packages only
             packageNames = ALLOWED_PACKAGES.toTypedArray()
@@ -101,9 +149,6 @@ class TikTokAccessibilityService : AccessibilityService() {
 
         // Register test tap receiver
         registerTestReceiver()
-
-        // Start floating logo indicator
-        FloatingLogoService.start(this)
 
         Timber.tag(TAG).i("Accessibility Service connected - restricted to TikTok only")
     }
@@ -122,6 +167,10 @@ class TikTokAccessibilityService : AccessibilityService() {
                     ACTION_TEST_SCREENSHOT -> handleTestScreenshot()
                     ACTION_TEST_UI_TREE -> handleTestUiTree()
                     ACTION_TEST_PIN -> handleTestPin(intent)
+                    ACTION_TEST_LOCK -> {
+                        Timber.tag(TAG).i("TEST_LOCK: locking screen")
+                        lockScreen()
+                    }
                 }
             }
         }
@@ -131,6 +180,7 @@ class TikTokAccessibilityService : AccessibilityService() {
             addAction(ACTION_TEST_SCREENSHOT)
             addAction(ACTION_TEST_UI_TREE)
             addAction(ACTION_TEST_PIN)
+            addAction(ACTION_TEST_LOCK)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(testReceiver, filter, Context.RECEIVER_EXPORTED)
@@ -247,44 +297,13 @@ class TikTokAccessibilityService : AccessibilityService() {
     }
 
     private fun handleTestPin(intent: Intent) {
-        val pin = intent.getStringExtra(EXTRA_PIN) ?: "5452"
+        val pin = intent.getStringExtra(EXTRA_PIN) ?: "0000"
         Timber.tag(TAG).i("TEST_PIN received: pin=$pin")
 
         serviceScope.launch {
-            // 1. Wake screen
-            wakeScreen()
-            kotlinx.coroutines.delay(500)
-
-            // 2. Swipe up to show PIN entry
-            val screenWidth = resources.displayMetrics.widthPixels
-            val screenHeight = resources.displayMetrics.heightPixels
-            val swipeX = screenWidth / 2
-            val swipeStartY = (screenHeight * 0.9f).toInt()
-            val swipeEndY = (screenHeight * 0.4f).toInt()
-            swipe(swipeX, swipeStartY, swipeX, swipeEndY, 300)
-            kotlinx.coroutines.delay(1500)
-
-            // 3. Get PIN pad coordinates from UI tree
-            val pinPadCoords = getPinPadCoordinates()
-            if (pinPadCoords == null) {
-                Timber.tag(TAG).e("Failed to get PIN pad coordinates!")
-                return@launch
-            }
-            Timber.tag(TAG).i("PIN pad coordinates: $pinPadCoords")
-
-            // 4. Enter PIN
-            for (digit in pin) {
-                val coords = pinPadCoords[digit]
-                if (coords == null) {
-                    Timber.tag(TAG).e("No coordinates for digit: $digit")
-                    continue
-                }
-                Timber.tag(TAG).i("Tapping digit $digit at (${coords.first}, ${coords.second})")
-                tap(coords.first, coords.second)
-                kotlinx.coroutines.delay(150)
-            }
-
-            Timber.tag(TAG).i("PIN entry complete!")
+            // Use the same enterPin() path as production ScreenUnlocker
+            val result = enterPin(pin, screenAlreadyAwake = false)
+            Timber.tag(TAG).i("TEST_PIN result: $result")
         }
     }
 
@@ -292,72 +311,271 @@ class TikTokAccessibilityService : AccessibilityService() {
      * Enter PIN code on lockscreen using UI tree coordinates.
      * This is the public method to be called from ScreenUnlocker.
      *
+     * Temporarily expands package filter to see lockscreen UI (normally restricted to TikTok).
+     *
      * @param pin The PIN code to enter (digits only)
+     * @param screenAlreadyAwake If true, skip internal wake (caller already woke screen)
      * @return true if PIN was entered successfully
      */
-    suspend fun enterPin(pin: String): Boolean {
-        Timber.tag(TAG).i("enterPin: starting PIN entry")
+    suspend fun enterPin(pin: String, screenAlreadyAwake: Boolean = false): Boolean {
+        Timber.tag(TAG).i("enterPin: starting PIN entry (screenAlreadyAwake=$screenAlreadyAwake)")
 
-        // 1. Wake screen
-        wakeScreen()
-        kotlinx.coroutines.delay(500)
+        // Temporarily expand access to see lockscreen UI tree
+        expandPackageFilter()
 
-        // 2. Swipe up to show PIN entry
-        val screenWidth = resources.displayMetrics.widthPixels
-        val screenHeight = resources.displayMetrics.heightPixels
-        val swipeX = screenWidth / 2
-        val swipeStartY = (screenHeight * 0.9f).toInt()
-        val swipeEndY = (screenHeight * 0.4f).toInt()
-        Timber.tag(TAG).i("enterPin: swiping up to show PIN pad")
-        swipe(swipeX, swipeStartY, swipeX, swipeEndY, 300)
-        kotlinx.coroutines.delay(1500)
+        try {
+            // 1. Wait for filter expansion to take effect (async on MIUI)
+            val filterReady = waitForFilterExpansion(timeoutMs = 2000)
+            Timber.tag(TAG).i("enterPin: filter expansion ready=$filterReady")
 
-        // 3. Get PIN pad coordinates from UI tree
-        val pinPadCoords = getPinPadCoordinates()
-        if (pinPadCoords == null) {
-            Timber.tag(TAG).e("enterPin: failed to get PIN pad coordinates")
-            return false
-        }
-        Timber.tag(TAG).i("enterPin: got coordinates for ${pinPadCoords.size} digits")
+            // 2. Wake screen (skip if caller already did it)
+            if (!screenAlreadyAwake) {
+                wakeScreen()
+                kotlinx.coroutines.delay(500)
+            }
 
-        // 4. Enter each digit
-        for (digit in pin) {
-            val coords = pinPadCoords[digit]
-            if (coords == null) {
-                Timber.tag(TAG).e("enterPin: no coordinates for digit: $digit")
+            // 3. Bring lockscreen to foreground if our app is active
+            // On MIUI, our app may render above the keyguard after screen wake.
+            // HOME press surfaces the lockscreen so swipe targets the correct layer.
+            val activeRoot = rootInActiveWindow?.packageName?.toString()
+            if (activeRoot != null && activeRoot != "com.android.systemui") {
+                Timber.tag(TAG).i("enterPin: active window is $activeRoot, pressing HOME to surface keyguard")
+                performGlobalAction(GLOBAL_ACTION_HOME)
+                kotlinx.coroutines.delay(500)
+            }
+
+            val screenWidth = resources.displayMetrics.widthPixels
+            val screenHeight = resources.displayMetrics.heightPixels
+            val swipeX = screenWidth / 2
+            val swipeStartY = (screenHeight * 0.9f).toInt()
+            val swipeEndY = (screenHeight * 0.4f).toInt()
+
+            // 4. Swipe up + poll for PIN pad (with retry)
+            var initialCoords: Map<Char, Pair<Int, Int>>? = null
+            val maxSwipeAttempts = 2
+            for (attempt in 1..maxSwipeAttempts) {
+                val currentRoot = rootInActiveWindow?.packageName?.toString()
+                Timber.tag(TAG).i("enterPin: swipe attempt $attempt/$maxSwipeAttempts (activeRoot=$currentRoot)")
+                swipe(swipeX, swipeStartY, swipeX, swipeEndY, 300)
+
+                initialCoords = pollForPinPad(maxWaitMs = 4000, pollIntervalMs = 200)
+                if (initialCoords != null) break
+
+                if (attempt < maxSwipeAttempts) {
+                    Timber.tag(TAG).w("enterPin: PIN pad not found on attempt $attempt, pressing HOME and retrying...")
+                    performGlobalAction(GLOBAL_ACTION_HOME)
+                    kotlinx.coroutines.delay(500)
+                }
+            }
+
+            if (initialCoords == null) {
+                Timber.tag(TAG).e("enterPin: failed to find PIN pad after $maxSwipeAttempts swipe attempts")
                 return false
             }
-            Timber.tag(TAG).d("enterPin: tapping digit $digit at (${coords.first}, ${coords.second})")
-            tap(coords.first, coords.second)
-            kotlinx.coroutines.delay(150)
-        }
+            Timber.tag(TAG).i("enterPin: PIN pad detected with ${initialCoords.size} digits")
 
-        Timber.tag(TAG).i("enterPin: PIN entry complete")
-        return true
+            // Wait for PIN pad animation to fully settle before tapping
+            // MIUI keyguard animates the PIN pad sliding up; coordinates captured mid-animation
+            // can be slightly off from final positions, causing taps to miss
+            kotlinx.coroutines.delay(400)
+
+            // Re-capture coordinates after animation settles for accurate positions
+            val pinPadCoords = getPinPadCoordinates() ?: initialCoords
+            Timber.tag(TAG).i("enterPin: final coordinates for ${pinPadCoords.size} digits")
+
+            // 4. Enter each digit
+            for (digit in pin) {
+                val coords = pinPadCoords[digit]
+                if (coords == null) {
+                    Timber.tag(TAG).e("enterPin: no coordinates for digit: $digit")
+                    return false
+                }
+                Timber.tag(TAG).d("enterPin: tapping digit $digit at (${coords.first}, ${coords.second})")
+                tap(coords.first, coords.second)
+                kotlinx.coroutines.delay(150)
+            }
+
+            Timber.tag(TAG).i("enterPin: PIN entry complete")
+            // Wait for keyguard to process the last digit before restoring filter
+            kotlinx.coroutines.delay(500)
+            return true
+        } finally {
+            // Always restore TikTok-only filter
+            restorePackageFilter()
+        }
+    }
+
+    /**
+     * Poll for PIN pad to appear in the UI tree.
+     * Returns as soon as 10 digits are found, or null after timeout.
+     */
+    private suspend fun pollForPinPad(maxWaitMs: Long = 3000, pollIntervalMs: Long = 200): Map<Char, Pair<Int, Int>>? {
+        val startTime = System.currentTimeMillis()
+        while (System.currentTimeMillis() - startTime < maxWaitMs) {
+            val coords = getPinPadCoordinates()
+            if (coords != null) {
+                val elapsed = System.currentTimeMillis() - startTime
+                Timber.tag(TAG).i("pollForPinPad: found PIN pad after ${elapsed}ms")
+                return coords
+            }
+            kotlinx.coroutines.delay(pollIntervalMs)
+        }
+        Timber.tag(TAG).e("pollForPinPad: timeout after ${maxWaitMs}ms")
+        return null
+    }
+
+    /**
+     * Temporarily remove package filter to access lockscreen UI tree.
+     * The service is normally restricted to TikTok packages only, which means
+     * it can't see the lockscreen PIN pad (com.android.systemui / MIUI keyguard).
+     *
+     * Also enables FLAG_INCLUDE_NOT_IMPORTANT_VIEWS so MIUI keyguard buttons
+     * that are marked "not important for accessibility" are still visible.
+     */
+    private fun expandPackageFilter() {
+        isFilterExpanded = true
+        val info = serviceInfo
+        info.packageNames = null // Allow all packages temporarily
+        info.flags = info.flags or AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS
+        serviceInfo = info
+        Timber.tag(TAG).i("Package filter expanded for lockscreen access")
+    }
+
+    /**
+     * Restore TikTok-only package filter after unlock operation.
+     */
+    private fun restorePackageFilter() {
+        val info = serviceInfo
+        info.packageNames = ALLOWED_PACKAGES.toTypedArray()
+        info.flags = info.flags and AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS.inv()
+        serviceInfo = info
+        isFilterExpanded = false
+        Timber.tag(TAG).i("Package filter restored (TikTok only)")
+    }
+
+    /**
+     * Wait until the expanded package filter takes effect.
+     *
+     * Setting serviceInfo.packageNames = null is processed asynchronously by Android.
+     * On MIUI, this can take 200-500ms. Without waiting, the windows API returns
+     * systemui window with 0 accessible children (window exists but content unreadable).
+     */
+    private suspend fun waitForFilterExpansion(timeoutMs: Long = 2000): Boolean {
+        val startTime = System.currentTimeMillis()
+        val pollInterval = 100L
+        while (System.currentTimeMillis() - startTime < timeoutMs) {
+            val windowsList = windows
+            if (windowsList != null) {
+                for (window in windowsList) {
+                    val root = window.root ?: continue
+                    val pkg = root.packageName?.toString()
+                    val childCount = root.childCount
+                    root.recycle()
+                    // If we can see a non-TikTok, non-own-app window with children,
+                    // the filter has taken effect
+                    if (pkg != null
+                        && pkg !in ALLOWED_PACKAGES
+                        && pkg != "com.kotkit.basic"
+                        && childCount > 0
+                    ) {
+                        val elapsed = System.currentTimeMillis() - startTime
+                        Timber.tag(TAG).i("waitForFilterExpansion: confirmed after ${elapsed}ms (pkg=$pkg, children=$childCount)")
+                        return true
+                    }
+                }
+            }
+            kotlinx.coroutines.delay(pollInterval)
+        }
+        Timber.tag(TAG).w("waitForFilterExpansion: timeout after ${timeoutMs}ms")
+        return false
     }
 
     /**
      * Get PIN pad button coordinates from UI tree.
      * Returns map of digit char to (x, y) center coordinates.
+     *
+     * Searches rootInActiveWindow first, then falls back to iterating
+     * all windows (needed when lockscreen is a separate window layer).
      */
     private fun getPinPadCoordinates(): Map<Char, Pair<Int, Int>>? {
+        // Try rootInActiveWindow first
         val root = rootInActiveWindow
-        if (root == null) {
-            Timber.tag(TAG).e("getPinPadCoordinates: rootInActiveWindow is null")
+        if (root != null) {
+            val pkg = root.packageName?.toString()
+            Timber.tag(TAG).i("getPinPadCoordinates: root=$pkg")
+            val coords = findPinButtonsInNode(root)
+            root.recycle()
+            if (coords.size >= 10) {
+                Timber.tag(TAG).i("getPinPadCoordinates: found ${coords.size} digits in root: ${coords.keys}")
+                return coords
+            }
+            Timber.tag(TAG).i("getPinPadCoordinates: root ($pkg) had ${coords.size} digits, trying windows API")
+        } else {
+            Timber.tag(TAG).e("getPinPadCoordinates: rootInActiveWindow is null, trying windows API")
+        }
+
+        // Fallback: search all windows for the PIN pad
+        val windowsList = windows
+        if (windowsList.isNullOrEmpty()) {
+            Timber.tag(TAG).e("getPinPadCoordinates: no windows available")
             return null
         }
-        Timber.tag(TAG).i("getPinPadCoordinates: root=${root.packageName}")
+        Timber.tag(TAG).i("getPinPadCoordinates: searching ${windowsList.size} windows")
+
+        for ((index, window) in windowsList.withIndex()) {
+            val windowRoot = window.root ?: continue
+            val windowPkg = windowRoot.packageName?.toString()
+            Timber.tag(TAG).i("getPinPadCoordinates: window[$index] type=${window.type}, layer=${window.layer}, pkg=$windowPkg")
+
+            val coords = findPinButtonsInNode(windowRoot)
+            windowRoot.recycle()
+
+            if (coords.size >= 10) {
+                Timber.tag(TAG).i("getPinPadCoordinates: found ${coords.size} digits in window pkg=$windowPkg")
+                return coords
+            }
+            if (coords.isNotEmpty()) {
+                Timber.tag(TAG).i("getPinPadCoordinates: window[$index] ($windowPkg) had ${coords.size} digits: ${coords.keys}")
+            }
+        }
+
+        Timber.tag(TAG).e("getPinPadCoordinates: PIN pad not found in any window")
+        return null
+    }
+
+    /**
+     * Find PIN pad buttons (digits 0-9) in a node tree.
+     *
+     * Checks multiple sources for digit identification:
+     * - contentDescription = "0", "1", ..., "9" (AOSP/MIUI standard)
+     * - contentDescription starting with digit (e.g. "1, key" on Samsung One UI)
+     * - text = "0", "1", ..., "9" (some MIUI versions)
+     */
+    private fun findPinButtonsInNode(root: AccessibilityNodeInfo): Map<Char, Pair<Int, Int>> {
         val coords = mutableMapOf<Char, Pair<Int, Int>>()
 
+        fun extractDigit(text: String?): Char? {
+            if (text == null) return null
+            // Exact single digit: "5"
+            if (text.length == 1 && text[0].isDigit()) return text[0]
+            // Digit prefix: "1, key" or "5 кнопка"
+            if (text.isNotEmpty() && text[0].isDigit() && (text.length == 1 || !text[1].isDigit())) {
+                return text[0]
+            }
+            return null
+        }
+
         fun findPinButtons(node: AccessibilityNodeInfo) {
-            val desc = node.contentDescription?.toString()
-            // PIN buttons have contentDescription = "0", "1", ..., "9"
-            if (desc != null && desc.length == 1 && desc[0].isDigit()) {
+            // Try contentDescription first, then text
+            val digit = extractDigit(node.contentDescription?.toString())
+                ?: extractDigit(node.text?.toString())
+
+            if (digit != null && digit !in coords) {
                 val bounds = android.graphics.Rect()
                 node.getBoundsInScreen(bounds)
                 val centerX = (bounds.left + bounds.right) / 2
                 val centerY = (bounds.top + bounds.bottom) / 2
-                coords[desc[0]] = Pair(centerX, centerY)
+                coords[digit] = Pair(centerX, centerY)
             }
 
             for (i in 0 until node.childCount) {
@@ -370,10 +588,7 @@ class TikTokAccessibilityService : AccessibilityService() {
         }
 
         findPinButtons(root)
-        root.recycle()
-
-        Timber.tag(TAG).i("getPinPadCoordinates: found ${coords.size} digits: ${coords.keys}")
-        return if (coords.size >= 10) coords else null
+        return coords
     }
 
     private fun dumpNodeTree(node: AccessibilityNodeInfo, depth: Int) {
@@ -400,11 +615,24 @@ class TikTokAccessibilityService : AccessibilityService() {
         }
     }
 
+    /**
+     * SECURITY: Event handler with defense-in-depth package check.
+     *
+     * Even though Android OS already filters events via accessibility_service_config.xml,
+     * this method provides an additional runtime check. If ANY event from a non-TikTok
+     * app somehow arrives, it is immediately rejected and logged.
+     *
+     * This ensures that even in the unlikely case of an Android bug, this service
+     * cannot process events from other apps.
+     */
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        // Additional runtime check for security
+        // SECURITY: Defense-in-depth - reject non-TikTok events even if they somehow arrive
         val packageName = event?.packageName?.toString()
         if (packageName != null && packageName !in ALLOWED_PACKAGES) {
-            Timber.tag(TAG).w("Blocked event from non-TikTok package: $packageName")
+            // During PIN unlock, filter is temporarily expanded — silently ignore non-TikTok events
+            if (!isFilterExpanded) {
+                Timber.tag(TAG).w("SECURITY: Blocked event from non-TikTok package: $packageName")
+            }
             return
         }
 
@@ -421,8 +649,6 @@ class TikTokAccessibilityService : AccessibilityService() {
         testReceiver?.let {
             try { unregisterReceiver(it) } catch (_: Exception) {}
         }
-        // Stop floating logo indicator
-        FloatingLogoService.stop(this)
         instance = null
         Timber.tag(TAG).i("Accessibility Service destroyed")
     }

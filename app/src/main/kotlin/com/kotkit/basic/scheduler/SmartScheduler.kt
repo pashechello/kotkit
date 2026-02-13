@@ -288,7 +288,8 @@ class SmartScheduler @Inject constructor(
             meowSoundService.playStarting()
         }
 
-        SchedulerNotifications.showStartingNotification(context, postId)
+        // Note: Foreground notification with "Stop" button is created by PostWorker.createForegroundInfo()
+        // Don't call showStartingNotification() here to avoid duplicate notifications with different IDs
 
         val data = Data.Builder()
             .putLong("post_id", postId)

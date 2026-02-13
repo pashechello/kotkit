@@ -59,7 +59,7 @@ interface NetworkTaskDao {
     @Query("""
         SELECT * FROM network_tasks
         WHERE status = 'assigned'
-        AND scheduledFor <= :currentTime
+        AND (scheduledFor IS NULL OR scheduledFor <= :currentTime)
         ORDER BY scheduledFor ASC
         LIMIT 1
     """)
@@ -77,6 +77,9 @@ interface NetworkTaskDao {
         AND completedAt >= :startOfDay
     """)
     suspend fun countCompletedToday(startOfDay: Long): Int
+
+    @Query("SELECT MAX(completedAt) FROM network_tasks WHERE status = 'completed'")
+    suspend fun getLastCompletedAt(): Long?
 
     // ========================================================================
     // Insert / Update / Delete

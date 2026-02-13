@@ -36,12 +36,14 @@ import androidx.compose.ui.window.Dialog
 import androidx.core.os.LocaleListCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.kotkit.basic.R
+import com.kotkit.basic.scheduler.AudiencePersona
 import com.kotkit.basic.ui.components.BounceOverscrollContainer
 import com.kotkit.basic.ui.components.ExactAlarmSettingsRow
 import com.kotkit.basic.ui.components.GlassCard
 import com.kotkit.basic.ui.components.GlassSettingRow
 import com.kotkit.basic.ui.components.GlowingIcon
 import com.kotkit.basic.ui.components.PulsingDot
+import com.kotkit.basic.ui.components.TikTokUsernameDialog
 import com.kotkit.basic.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -87,71 +89,49 @@ fun SettingsScreen(
 
             GlassSettingRow(
                 title = stringResource(R.string.settings_accessibility_service),
-                subtitle = if (uiState.isAccessibilityEnabled)
-                    stringResource(R.string.settings_accessibility_enabled)
-                else
-                    stringResource(R.string.settings_accessibility_not_enabled),
+                subtitle = when {
+                    uiState.isLoading -> stringResource(R.string.settings_checking)
+                    uiState.isAccessibilityEnabled -> stringResource(R.string.settings_accessibility_enabled)
+                    else -> stringResource(R.string.settings_accessibility_not_enabled)
+                },
                 icon = Icons.Default.Accessibility,
                 onClick = {
-                    if (!uiState.isAccessibilityEnabled) {
+                    if (!uiState.isLoading && !uiState.isAccessibilityEnabled) {
                         context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
                     }
                 },
-                iconColor = if (uiState.isAccessibilityEnabled) Success else BrandPink,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                trailingContent = {
-                    if (uiState.isAccessibilityEnabled) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            PulsingDot(color = Success, size = 8.dp)
-                            Icon(
-                                Icons.Default.CheckCircle,
-                                contentDescription = null,
-                                tint = Success,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                    } else {
-                        GlassChip(text = stringResource(R.string.enable))
-                    }
-                }
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Overlay Permission (for floating indicator)
-            GlassSettingRow(
-                title = stringResource(R.string.settings_overlay_permission),
-                subtitle = if (uiState.hasOverlayPermission)
-                    stringResource(R.string.settings_overlay_enabled)
-                else
-                    stringResource(R.string.settings_overlay_not_enabled),
-                icon = Icons.Default.Layers,
-                onClick = {
-                    if (!uiState.hasOverlayPermission) {
-                        viewModel.openOverlaySettings()
-                    }
+                iconColor = when {
+                    uiState.isLoading -> TextTertiary
+                    uiState.isAccessibilityEnabled -> Success
+                    else -> BrandPink
                 },
-                iconColor = if (uiState.hasOverlayPermission) Success else BrandPink,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                 trailingContent = {
-                    if (uiState.hasOverlayPermission) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            PulsingDot(color = Success, size = 8.dp)
-                            Icon(
-                                Icons.Default.CheckCircle,
-                                contentDescription = null,
-                                tint = Success,
-                                modifier = Modifier.size(24.dp)
+                    when {
+                        uiState.isLoading -> {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                color = BrandCyan,
+                                strokeWidth = 2.dp
                             )
                         }
-                    } else {
-                        GlassChip(text = stringResource(R.string.enable))
+                        uiState.isAccessibilityEnabled -> {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                PulsingDot(color = Success, size = 8.dp)
+                                Icon(
+                                    Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    tint = Success,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
+                        else -> {
+                            GlassChip(text = stringResource(R.string.enable))
+                        }
                     }
                 }
             )
@@ -192,6 +172,112 @@ fun SettingsScreen(
                     }
                 }
             )
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Worker Mode Reliability Section
+            SettingsSectionHeader(
+                title = stringResource(R.string.settings_worker_reliability),
+                icon = Icons.Outlined.Shield
+            )
+
+            // Battery Optimization
+            GlassSettingRow(
+                title = stringResource(R.string.settings_battery_optimization),
+                subtitle = if (uiState.isBatteryOptimizationDisabled)
+                    stringResource(R.string.settings_battery_disabled)
+                else
+                    stringResource(R.string.settings_battery_enabled),
+                icon = Icons.Default.BatteryFull,
+                onClick = {
+                    if (!uiState.isBatteryOptimizationDisabled) {
+                        viewModel.openBatteryOptimizationSettings()
+                    }
+                },
+                iconColor = if (uiState.isBatteryOptimizationDisabled) Success else Warning,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                trailingContent = {
+                    if (uiState.isBatteryOptimizationDisabled) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            PulsingDot(color = Success, size = 8.dp)
+                            Icon(
+                                Icons.Default.CheckCircle,
+                                contentDescription = null,
+                                tint = Success,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    } else {
+                        GlassChip(text = stringResource(R.string.fix))
+                    }
+                }
+            )
+
+            // OEM-specific autostart (conditionally shown for Xiaomi/Samsung/etc)
+            if (uiState.isAutostartRequired) {
+                Spacer(modifier = Modifier.height(8.dp))
+
+                GlassSettingRow(
+                    title = stringResource(R.string.settings_oem_autostart, uiState.manufacturerName),
+                    subtitle = if (uiState.isAutostartConfirmed)
+                        stringResource(R.string.settings_oem_autostart_enabled)
+                    else
+                        stringResource(R.string.settings_oem_autostart_subtitle, uiState.manufacturerName),
+                    icon = Icons.Default.PhonelinkSetup,
+                    onClick = {
+                        if (!uiState.isAutostartConfirmed) {
+                            viewModel.openAutostartSettings()
+                        }
+                    },
+                    iconColor = if (uiState.isAutostartConfirmed) Success else BrandPink,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    trailingContent = {
+                        if (uiState.isAutostartConfirmed) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                PulsingDot(color = Success, size = 8.dp)
+                                Icon(
+                                    Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    tint = Success,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        } else {
+                            GlassChip(text = stringResource(R.string.enable))
+                        }
+                    }
+                )
+            }
+
+            // Autostart confirmation dialog
+            if (uiState.showAutostartConfirmDialog) {
+                GlassAutostartConfirmDialog(
+                    manufacturerName = uiState.manufacturerName,
+                    onConfirm = { viewModel.confirmAutostartEnabled() },
+                    onDismiss = { viewModel.dismissAutostartDialog() }
+                )
+            }
+
+            // Autostart manual instructions dialog (when settings can't be opened automatically)
+            if (uiState.showAutostartManualDialog) {
+                GlassAutostartManualDialog(
+                    instructions = viewModel.getAutostartInstructions(),
+                    onOpenSettings = {
+                        viewModel.dismissAutostartManualDialog()
+                        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                            data = Uri.parse("package:${context.packageName}")
+                        }
+                        context.startActivity(intent)
+                    },
+                    onDismiss = { viewModel.dismissAutostartManualDialog() }
+                )
+            }
 
             Spacer(modifier = Modifier.height(20.dp))
 
@@ -312,6 +398,55 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
+            // Target Audience Section
+            SettingsSectionHeader(
+                title = stringResource(R.string.settings_target_audience),
+                icon = Icons.Outlined.People
+            )
+
+            var showPersonaDialog by remember { mutableStateOf(false) }
+
+            GlassSettingRow(
+                title = stringResource(R.string.settings_target_audience),
+                subtitle = stringResource(uiState.selectedPersona.descriptionRes),
+                icon = Icons.Default.People,
+                onClick = { showPersonaDialog = true },
+                iconColor = BrandPink,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                trailingContent = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = stringResource(uiState.selectedPersona.displayNameRes),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = BrandPink
+                        )
+                        Icon(
+                            Icons.Default.ChevronRight,
+                            contentDescription = null,
+                            tint = TextTertiary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+            )
+
+            if (showPersonaDialog) {
+                GlassPersonaDialog(
+                    currentPersona = uiState.selectedPersona,
+                    onPersonaSelected = { persona ->
+                        viewModel.setPersona(persona)
+                        showPersonaDialog = false
+                    },
+                    onDismiss = { showPersonaDialog = false }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
             // Account Section
             SettingsSectionHeader(
                 title = stringResource(R.string.settings_account),
@@ -320,7 +455,7 @@ fun SettingsScreen(
 
             if (uiState.isLoggedIn) {
                 GlassSettingRow(
-                    title = stringResource(R.string.settings_logged_in),
+                    title = uiState.userEmail ?: stringResource(R.string.settings_logged_in),
                     subtitle = stringResource(R.string.settings_tap_to_logout),
                     icon = Icons.Default.Person,
                     onClick = { viewModel.logout() },
@@ -355,6 +490,41 @@ fun SettingsScreen(
                             modifier = Modifier.size(24.dp)
                         )
                     }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // TikTok Section
+            SettingsSectionHeader(
+                title = stringResource(R.string.settings_tiktok),
+                icon = Icons.Outlined.VideoLibrary
+            )
+
+            GlassSettingRow(
+                title = stringResource(R.string.settings_tiktok_username),
+                subtitle = uiState.tiktokUsername?.let { "@$it" }
+                    ?: stringResource(R.string.settings_tiktok_not_set),
+                icon = Icons.Default.AccountCircle,
+                onClick = { viewModel.showTiktokDialog() },
+                iconColor = if (uiState.tiktokUsername != null) Success else Warning,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                trailingContent = {
+                    Icon(
+                        Icons.Default.Edit,
+                        contentDescription = null,
+                        tint = TextTertiary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            )
+
+            if (uiState.showTiktokUsernameDialog) {
+                TikTokUsernameDialog(
+                    initialUsername = uiState.tiktokUsername ?: "",
+                    isSaving = uiState.isSavingTiktokUsername,
+                    onSave = { username -> viewModel.updateTiktokUsername(username) },
+                    onDismiss = { viewModel.dismissTiktokDialog() }
                 )
             }
 
@@ -542,27 +712,13 @@ private fun GlassLanguageDialog(
                 .shadow(
                     elevation = 24.dp,
                     shape = RoundedCornerShape(24.dp),
-                    ambientColor = BrandCyan.copy(alpha = 0.2f),
-                    spotColor = BrandPink.copy(alpha = 0.2f)
+                    ambientColor = BrandCyan.copy(alpha = 0.3f),
+                    spotColor = BrandPink.copy(alpha = 0.3f)
                 )
                 .clip(RoundedCornerShape(24.dp))
-                .background(SurfaceElevated1)
-                .border(1.dp, BorderDefault, RoundedCornerShape(24.dp))
+                .background(SurfaceDialog)
+                .border(1.dp, BorderStrong, RoundedCornerShape(24.dp))
         ) {
-            // Gradient overlay
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        brush = Brush.linearGradient(
-                            colors = listOf(
-                                BrandCyan.copy(alpha = 0.05f),
-                                BrandPink.copy(alpha = 0.05f)
-                            )
-                        )
-                    )
-            )
-
             Column(
                 modifier = Modifier.padding(24.dp)
             ) {
@@ -679,6 +835,238 @@ private fun GlassLanguageOption(
 }
 
 @Composable
+private fun GlassPersonaDialog(
+    currentPersona: AudiencePersona,
+    onPersonaSelected: (AudiencePersona) -> Unit,
+    onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .shadow(
+                    elevation = 32.dp,
+                    shape = RoundedCornerShape(28.dp),
+                    ambientColor = BrandPink.copy(alpha = 0.4f),
+                    spotColor = BrandCyan.copy(alpha = 0.4f)
+                )
+                .clip(RoundedCornerShape(28.dp))
+                .background(SurfaceDialog)
+                .border(1.dp, BorderStrong, RoundedCornerShape(28.dp))
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(20.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                // Header with icon
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(
+                                brush = Brush.linearGradient(
+                                    colors = listOf(BrandPink, GradientPurple)
+                                )
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.People,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(26.dp)
+                        )
+                    }
+                    Text(
+                        text = stringResource(R.string.persona_dialog_title),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Text(
+                    text = stringResource(R.string.persona_dialog_explanation),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary,
+                    lineHeight = 18.sp
+                )
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Persona options
+                AudiencePersona.entries.forEach { persona ->
+                    GlassPersonaCard(
+                        persona = persona,
+                        isSelected = currentPersona == persona,
+                        onClick = { onPersonaSelected(persona) }
+                    )
+                    if (persona != AudiencePersona.entries.last()) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Close button with gradient
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(
+                            brush = Brush.linearGradient(
+                                colors = listOf(
+                                    BrandCyan.copy(alpha = 0.15f),
+                                    BrandPink.copy(alpha = 0.15f)
+                                )
+                            )
+                        )
+                        .border(1.dp, BorderDefault, RoundedCornerShape(14.dp))
+                        .clickable(onClick = onDismiss)
+                        .padding(vertical = 14.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = stringResource(R.string.dialog_ok),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TextPrimary
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GlassPersonaCard(
+    persona: AudiencePersona,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    val borderColor = if (isSelected) BrandPink else BorderSubtle
+    val backgroundColor = if (isSelected) BrandPink.copy(alpha = 0.12f) else SurfaceGlassLight
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(backgroundColor)
+            .border(
+                width = if (isSelected) 1.5.dp else 1.dp,
+                color = borderColor,
+                shape = RoundedCornerShape(16.dp)
+            )
+            .clickable(onClick = onClick)
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Emoji avatar
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(
+                    if (isSelected)
+                        Brush.linearGradient(listOf(BrandPink.copy(alpha = 0.2f), GradientPurple.copy(alpha = 0.2f)))
+                    else
+                        Brush.linearGradient(listOf(SurfaceGlassMedium, SurfaceGlassHeavy))
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = stringResource(persona.emojiRes),
+                style = MaterialTheme.typography.titleLarge
+            )
+        }
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        // Content
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = stringResource(persona.displayNameRes),
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = if (isSelected) BrandPink else TextPrimary
+            )
+            Text(
+                text = stringResource(persona.descriptionRes),
+                style = MaterialTheme.typography.bodySmall,
+                color = TextTertiary
+            )
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // Peak hours visualization
+            PeakHoursBar(
+                peakHours = persona.peakHours,
+                isSelected = isSelected
+            )
+        }
+
+        // Checkmark
+        if (isSelected) {
+            Spacer(modifier = Modifier.width(8.dp))
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .background(BrandPink),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PeakHoursBar(
+    peakHours: List<Int>,
+    isSelected: Boolean
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(8.dp)
+            .clip(RoundedCornerShape(4.dp))
+            .background(SurfaceGlassLight),
+        horizontalArrangement = Arrangement.spacedBy(1.dp)
+    ) {
+        // 24 hour slots (showing 6-24, 0-5 is usually inactive)
+        for (hour in 6..23) {
+            val isPeakHour = hour in peakHours
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .background(
+                        when {
+                            isPeakHour && isSelected -> BrandPink
+                            isPeakHour -> BrandCyan.copy(alpha = 0.6f)
+                            else -> Color.Transparent
+                        }
+                    )
+            )
+        }
+    }
+}
+
+@Composable
 private fun BrandFooter() {
     Column(
         modifier = Modifier
@@ -713,5 +1101,215 @@ private fun BrandFooter() {
             style = MaterialTheme.typography.bodySmall,
             color = TextMuted
         )
+    }
+}
+
+/**
+ * Диалог подтверждения включения автозапуска.
+ * Показывается после того как пользователь вернулся из системных настроек OEM.
+ */
+@Composable
+private fun GlassAutostartConfirmDialog(
+    manufacturerName: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .shadow(
+                    elevation = 24.dp,
+                    shape = RoundedCornerShape(24.dp),
+                    ambientColor = Success.copy(alpha = 0.3f),
+                    spotColor = BrandCyan.copy(alpha = 0.3f)
+                )
+                .clip(RoundedCornerShape(24.dp))
+                .background(SurfaceDialog)
+                .border(1.dp, BorderStrong, RoundedCornerShape(24.dp))
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Icon
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(CircleShape)
+                        .background(
+                            brush = Brush.linearGradient(
+                                colors = listOf(Success.copy(alpha = 0.3f), BrandCyan.copy(alpha = 0.3f))
+                            )
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PhonelinkSetup,
+                        contentDescription = null,
+                        tint = Success,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = stringResource(R.string.autostart_confirm_title),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimary
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = stringResource(R.string.autostart_confirm_message, manufacturerName),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextSecondary,
+                    modifier = Modifier.padding(horizontal = 8.dp)
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Confirm button
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(
+                            brush = Brush.linearGradient(
+                                colors = listOf(Success, BrandCyan)
+                            )
+                        )
+                        .clickable { onConfirm() }
+                        .padding(vertical = 14.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = stringResource(R.string.autostart_confirm_yes),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Dismiss button
+                TextButton(onClick = onDismiss) {
+                    Text(
+                        text = stringResource(R.string.autostart_confirm_no),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = TextTertiary
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Диалог с инструкциями для ручного включения разрешений.
+ * Показывается когда не удалось открыть настройки OEM автоматически.
+ */
+@Composable
+private fun GlassAutostartManualDialog(
+    instructions: String,
+    onOpenSettings: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .shadow(
+                    elevation = 24.dp,
+                    shape = RoundedCornerShape(24.dp),
+                    ambientColor = BrandPink.copy(alpha = 0.3f),
+                    spotColor = BrandCyan.copy(alpha = 0.3f)
+                )
+                .clip(RoundedCornerShape(24.dp))
+                .background(SurfaceDialog)
+                .border(1.dp, BorderStrong, RoundedCornerShape(24.dp))
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Icon
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(CircleShape)
+                        .background(
+                            brush = Brush.linearGradient(
+                                colors = listOf(BrandPink.copy(alpha = 0.3f), BrandCyan.copy(alpha = 0.3f))
+                            )
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Settings,
+                        contentDescription = null,
+                        tint = BrandPink,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = stringResource(R.string.autostart_manual_title),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimary
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = stringResource(R.string.autostart_manual_message, instructions),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextSecondary,
+                    modifier = Modifier.padding(horizontal = 8.dp)
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Open settings button
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(
+                            brush = Brush.linearGradient(
+                                colors = listOf(BrandPink, BrandCyan)
+                            )
+                        )
+                        .clickable { onOpenSettings() }
+                        .padding(vertical = 14.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = stringResource(R.string.autostart_manual_open_settings),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Dismiss button
+                TextButton(onClick = onDismiss) {
+                    Text(
+                        text = stringResource(R.string.autostart_manual_done),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = TextTertiary
+                    )
+                }
+            }
+        }
     }
 }

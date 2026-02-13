@@ -22,7 +22,7 @@ class DatabaseMigrationTest {
                 videoSizeBytes INTEGER,
                 caption TEXT NOT NULL,
                 status TEXT NOT NULL,
-                priceUsd REAL NOT NULL,
+                priceRub REAL NOT NULL,
                 assignedAt INTEGER,
                 scheduledFor INTEGER,
                 lastHeartbeat INTEGER,
@@ -53,9 +53,9 @@ class DatabaseMigrationTest {
             CREATE TABLE IF NOT EXISTS worker_profile (
                 id TEXT NOT NULL PRIMARY KEY,
                 isActive INTEGER NOT NULL DEFAULT 0,
-                totalEarnedUsd REAL NOT NULL DEFAULT 0.0,
-                availableBalanceUsd REAL NOT NULL DEFAULT 0.0,
-                pendingBalanceUsd REAL NOT NULL DEFAULT 0.0,
+                totalEarnedRub REAL NOT NULL DEFAULT 0.0,
+                availableBalanceRub REAL NOT NULL DEFAULT 0.0,
+                pendingBalanceRub REAL NOT NULL DEFAULT 0.0,
                 completedTasksCount INTEGER NOT NULL DEFAULT 0,
                 lastSyncAt INTEGER,
                 createdAt INTEGER NOT NULL
@@ -64,7 +64,7 @@ class DatabaseMigrationTest {
 
         assertTrue("Missing id column", sql.contains("id TEXT NOT NULL PRIMARY KEY"))
         assertTrue("Missing isActive column", sql.contains("isActive INTEGER NOT NULL"))
-        assertTrue("Missing totalEarnedUsd column", sql.contains("totalEarnedUsd REAL"))
+        assertTrue("Missing totalEarnedRub column", sql.contains("totalEarnedRub REAL"))
     }
 
     @Test
@@ -74,7 +74,7 @@ class DatabaseMigrationTest {
                 id TEXT NOT NULL PRIMARY KEY,
                 taskId TEXT NOT NULL,
                 campaignId TEXT NOT NULL,
-                amountUsd REAL NOT NULL,
+                amountRub REAL NOT NULL,
                 status TEXT NOT NULL,
                 earnedAt INTEGER NOT NULL,
                 confirmedAt INTEGER,
@@ -84,7 +84,7 @@ class DatabaseMigrationTest {
 
         assertTrue("Missing id column", sql.contains("id TEXT NOT NULL PRIMARY KEY"))
         assertTrue("Missing taskId column", sql.contains("taskId TEXT NOT NULL"))
-        assertTrue("Missing amountUsd column", sql.contains("amountUsd REAL NOT NULL"))
+        assertTrue("Missing amountRub column", sql.contains("amountRub REAL NOT NULL"))
     }
 
     @Test

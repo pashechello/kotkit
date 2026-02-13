@@ -21,9 +21,13 @@
     <!-- Foreground Service -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
     <!-- Wake Lock -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!-- Battery Optimization Exemption (for Worker Mode reliability) -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <!-- Boot -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
@@ -35,11 +39,14 @@
     <!-- Notifications -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Full-screen intent (for bringing app to foreground on MIUI) -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+
+    <!-- Overlay (for clipboard reading on Android 10+) -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
     <!-- Screen Unlock -->
     <uses-permission android:name="android.permission.DISABLE_KEYGUARD" />
-
-    <!-- Overlay for floating status indicator -->
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <application
         android:name=".App"
@@ -60,6 +67,9 @@
             android:name=".ui.MainActivity"
             android:exported="true"
             android:launchMode="singleTask"
+            android:showOnLockScreen="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
             android:theme="@style/Theme.AutoPoster">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -133,20 +143,7 @@
         <service
             android:name=".network.NetworkWorkerService"
             android:exported="false"
-            android:foregroundServiceType="specialUse">
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="automation" />
-        </service>
-
-        <!-- Floating Logo Service (Status Indicator) -->
-        <service
-            android:name=".status.FloatingLogoService"
-            android:exported="false"
-            android:foregroundServiceType="specialUse">
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="status_indicator" />
+            android:foregroundServiceType="dataSync">
         </service>
 
         <!-- Disable default WorkManager initializer (using Hilt) -->
@@ -181,6 +178,20 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_provider_paths" />
         </provider>
+
+        <!-- Firebase Cloud Messaging Service -->
+        <service
+            android:name=".fcm.KotKitFirebaseMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <!-- FCM default notification channel -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="kotkit_network" />
 
     </application>
 

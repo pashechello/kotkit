@@ -35,6 +35,10 @@ val SurfaceGlassLight = Color(0x14FFFFFF) // 8%
 val SurfaceGlassMedium = Color(0x1FFFFFFF) // 12%
 val SurfaceGlassHeavy = Color(0x33FFFFFF) // 20%
 
+// Dialog surfaces - solid dark for glassmorphism dialogs
+val SurfaceDialog = Color(0xFF1A1A1F) // Solid dark background for dialogs
+val SurfaceDialogOverlay = Color(0xE6121218) // 90% opacity dark for modal overlays
+
 // Legacy
 val BackgroundDark = SurfaceBase
 val SurfaceDark = SurfaceElevated1

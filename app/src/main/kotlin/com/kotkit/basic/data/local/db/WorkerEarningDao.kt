@@ -26,11 +26,11 @@ interface WorkerEarningDao {
     @Query("SELECT * FROM worker_earnings WHERE id = :id")
     suspend fun getById(id: String): WorkerEarningEntity?
 
-    @Query("SELECT SUM(amountUsd) FROM worker_earnings WHERE status = :status")
+    @Query("SELECT SUM(amountRub) FROM worker_earnings WHERE status = :status")
     suspend fun sumByStatus(status: String): Float?
 
     @Query("""
-        SELECT SUM(amountUsd) FROM worker_earnings
+        SELECT SUM(amountRub) FROM worker_earnings
         WHERE createdAt >= :startOfDay
     """)
     suspend fun sumTodayEarnings(startOfDay: Long): Float?

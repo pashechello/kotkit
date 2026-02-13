@@ -35,6 +35,16 @@ class VideoDownloader @Inject constructor(
     }
 
     /**
+     * Bare OkHttpClient for presigned S3/R2 URL downloads.
+     * Must NOT have auth/correlation interceptors — extra headers invalidate presigned URL signatures.
+     */
+    private val downloadClient: OkHttpClient = OkHttpClient.Builder()
+        .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+        .readTimeout(5, java.util.concurrent.TimeUnit.MINUTES)
+        .writeTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+        .build()
+
+    /**
      * Download video with resume support.
      *
      * @param url Presigned S3 URL
@@ -75,7 +85,7 @@ class VideoDownloader @Inject constructor(
             }
 
             val request = requestBuilder.build()
-            val response = okHttpClient.newCall(request).execute()
+            val response = downloadClient.newCall(request).execute()
 
             if (!response.isSuccessful && response.code != 206) {
                 throw IOException("Download failed: HTTP ${response.code}")

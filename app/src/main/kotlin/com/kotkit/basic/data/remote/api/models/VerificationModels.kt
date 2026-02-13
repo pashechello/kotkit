@@ -61,3 +61,34 @@ data class VerificationStatsResponse(
     @SerializedName("total_strikes") val totalStrikes: Int,
     @SerializedName("is_banned") val isBanned: Boolean
 )
+
+// ========================================================================
+// URL Submission (manual fallback when discovery fails)
+// ========================================================================
+
+data class UrlSubmissionRequest(
+    @SerializedName("tiktok_video_url") val tiktokVideoUrl: String
+)
+
+data class UrlSubmissionResponse(
+    @SerializedName("id") val id: String,
+    @SerializedName("tiktok_video_url") val tiktokVideoUrl: String,
+    @SerializedName("discovery_method") val discoveryMethod: String,
+    @SerializedName("reward_amount_rub") val rewardAmountRub: Float? = null
+)
+
+data class CompletedTaskItem(
+    @SerializedName("task_id") val taskId: String,
+    @SerializedName("verification_id") val verificationId: String,
+    @SerializedName("campaign_name") val campaignName: String,
+    @SerializedName("completed_at") val completedAt: Long,
+    @SerializedName("price_rub") val priceRub: Float,
+    @SerializedName("tiktok_video_url") val tiktokVideoUrl: String? = null,
+    @SerializedName("verification_status") val verificationStatus: String,
+    @SerializedName("needs_url_submission") val needsUrlSubmission: Boolean
+)
+
+data class CompletedTasksResponse(
+    @SerializedName("tasks") val tasks: List<CompletedTaskItem>,
+    @SerializedName("total") val total: Int
+)

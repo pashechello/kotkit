@@ -19,9 +19,9 @@ data class TaskResponse(
     @SerializedName("video_s3_key") val videoS3Key: String,
     @SerializedName("video_hash") val videoHash: String?,
     @SerializedName("video_size_bytes") val videoSizeBytes: Long?,
-    val caption: String,
+    val caption: String?,
     val status: String, // pending, assigned, downloading, posting, verifying, completed, failed, expired
-    @SerializedName("price_usd") val priceUsd: Float,
+    @SerializedName("price_rub") val priceRub: Float,
     @SerializedName("assigned_worker_id") val assignedWorkerId: String?,
     @SerializedName("assigned_at") val assignedAt: Long?,
     @SerializedName("scheduled_for") val scheduledFor: Long?,
@@ -34,6 +34,7 @@ data class TaskResponse(
     @SerializedName("error_message") val errorMessage: String?,
     @SerializedName("error_type") val errorType: String?,
     @SerializedName("retry_count") val retryCount: Int,
+    @SerializedName("video_thumbnail_url") val videoThumbnailUrl: String? = null,
     @SerializedName("created_at") val createdAt: Long,
     @SerializedName("updated_at") val updatedAt: Long?
 )
@@ -131,4 +132,7 @@ object ErrorType {
     // Manual intervention required
     const val TIKTOK_CAPTCHA = "captcha"
     const val UNKNOWN_ERROR = "unknown_error"
+
+    // Duplicate protection
+    const val DUPLICATE_VIDEO = "duplicate_video"
 }

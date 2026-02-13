@@ -22,6 +22,7 @@ class ActionHandler @Inject constructor(
             is ExecutionResult.Success -> ActionResult.Success
             is ExecutionResult.Done -> ActionResult.Done(result.message)
             is ExecutionResult.PublishTapped -> ActionResult.Success // Publish tapped, continue flow
+            is ExecutionResult.Cancelled -> ActionResult.Failed("Операция отменена", recoverable = false)
             is ExecutionResult.Failed -> ActionResult.Failed(result.reason, recoverable = true)
             is ExecutionResult.Error -> {
                 if (result.recoverable) {

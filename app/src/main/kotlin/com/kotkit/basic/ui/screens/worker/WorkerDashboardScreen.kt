@@ -2,6 +2,8 @@ package com.kotkit.basic.ui.screens.worker
 
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.shape.CircleShape
@@ -19,12 +21,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.foundation.clickable
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.kotkit.basic.R
+import com.kotkit.basic.ui.components.TikTokUsernameDialog
 import com.kotkit.basic.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -34,6 +38,7 @@ fun WorkerDashboardScreen(
     onNavigateToAvailableTasks: () -> Unit = {},
     onNavigateToActiveTasks: () -> Unit = {},
     onNavigateToEarnings: () -> Unit = {},
+    onNavigateToCompletedTasks: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
     viewModel: WorkerDashboardViewModel = hiltViewModel()
 ) {
@@ -46,6 +51,16 @@ fun WorkerDashboardScreen(
             snackbarHostState.showSnackbar(error)
             viewModel.clearError()
         }
+    }
+
+    // TikTok username dialog
+    if (uiState.showTiktokUsernameDialog) {
+        TikTokUsernameDialog(
+            initialUsername = uiState.profile?.tiktokUsername ?: "",
+            isSaving = uiState.isSavingUsername,
+            onSave = { username -> viewModel.saveTiktokUsername(username) },
+            onDismiss = { viewModel.dismissTiktokUsernameDialog() }
+        )
     }
 
     Scaffold(
@@ -80,6 +95,34 @@ fun WorkerDashboardScreen(
                 availableBalance = uiState.availableBalance
             )
 
+            // TikTok account label
+            val tiktokUsername = uiState.profile?.tiktokUsername
+            if (!tiktokUsername.isNullOrBlank()) {
+                Spacer(Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(SurfaceElevated1)
+                        .clickable { viewModel.openUsernameEditor() }
+                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "@$tiktokUsername",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = BrandCyan
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Icon(
+                        Icons.Default.Edit,
+                        contentDescription = "Edit",
+                        tint = TextMuted,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+            }
+
             // CENTER: Big Money Button (takes remaining space)
             Box(
                 modifier = Modifier
@@ -91,27 +134,33 @@ fun WorkerDashboardScreen(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     MoneyButton(
-                        onClick = { /* TODO: Coming soon */ },
-                        enabled = false // Пока недоступно
+                        isActive = uiState.isWorkerModeActive,
+                        isToggling = uiState.isToggling,
+                        onClick = { viewModel.requestToggleWorkerMode() }
                     )
 
                     Spacer(Modifier.height(16.dp))
 
-                    // Coming soon text
+                    // Status text
                     Text(
-                        text = stringResource(R.string.worker_coming_soon),
+                        text = if (uiState.isWorkerModeActive) {
+                            stringResource(R.string.worker_mode_active)
+                        } else {
+                            stringResource(R.string.worker_mode_inactive)
+                        },
                         style = MaterialTheme.typography.bodyMedium,
-                        color = TextTertiary,
+                        color = if (uiState.isWorkerModeActive) Success else TextTertiary,
                         textAlign = TextAlign.Center
                     )
                 }
             }
 
-            // BOTTOM: Stats Card
+            // BOTTOM: Stats Card (clickable → opens completed tasks)
             StatsCard(
                 completedTasks = uiState.completedTasks,
                 successRate = uiState.successRate,
-                rating = uiState.rating
+                rating = uiState.rating,
+                onClick = onNavigateToCompletedTasks
             )
 
             Spacer(Modifier.height(24.dp))
@@ -144,7 +193,7 @@ private fun IncomeCard(
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                text = "$${String.format("%.2f", totalEarned)}",
+                text = "${String.format("%.2f", totalEarned)} ₽",
                 style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.Bold,
                 color = Success,
@@ -164,9 +213,21 @@ private fun IncomeCard(
 
 @Composable
 private fun MoneyButton(
-    onClick: () -> Unit,
-    enabled: Boolean
+    isActive: Boolean,
+    isToggling: Boolean,
+    onClick: () -> Unit
 ) {
+    // Press animation
+    var isPressed by remember { mutableStateOf(false) }
+    val pressScale by animateFloatAsState(
+        targetValue = if (isPressed || isToggling) 0.92f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "press_scale"
+    )
+
     // Pulsing animation for the glow effect
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val pulseScale by infiniteTransition.animateFloat(
@@ -189,7 +250,7 @@ private fun MoneyButton(
         label = "glow_alpha"
     )
 
-    // Red gradient for enabled state - объёмный эффект
+    // Red gradient - inactive state (объёмный эффект)
     val redGradient = Brush.verticalGradient(
         colors = listOf(
             Color(0xFFFF6B6B), // Lighter red top (highlight)
@@ -199,15 +260,19 @@ private fun MoneyButton(
         )
     )
 
-    // Disabled grey gradient - тоже объёмный
-    val disabledGradient = Brush.verticalGradient(
+    // Green gradient - active state (объёмный эффект)
+    val greenGradient = Brush.verticalGradient(
         colors = listOf(
-            Color(0xFF5A5A5A), // Lighter grey top
-            Color(0xFF4A4A4A), // Main grey
-            Color(0xFF3A3A3A), // Darker grey bottom
-            Color(0xFF2A2A2A)  // Deep grey edge
+            Color(0xFF6BFF6B), // Lighter green top (highlight)
+            Color(0xFF44EE44), // Main green
+            Color(0xFF22CC22), // Darker green bottom (shadow)
+            Color(0xFF11AA11)  // Deep green edge
         )
     )
+
+    val currentGradient = if (isActive) greenGradient else redGradient
+    val glowColor = if (isActive) Color(0xFF44FF44) else Color(0xFFFF4444)
+    val glowColorDark = if (isActive) Color(0xFF00CC00) else Color(0xFFCC0000)
 
     BoxWithConstraints(
         contentAlignment = Alignment.Center,
@@ -217,53 +282,70 @@ private fun MoneyButton(
         val buttonSize = (maxWidth * 0.85f).coerceAtMost(320.dp)
         val glowSize = buttonSize + 20.dp
 
-        // Glow effect behind button (only when enabled)
-        if (enabled) {
-            Box(
-                modifier = Modifier
-                    .size(glowSize)
-                    .graphicsLayer {
-                        scaleX = pulseScale
-                        scaleY = pulseScale
-                        alpha = glowAlpha
-                    }
-                    .background(
-                        brush = Brush.radialGradient(
-                            colors = listOf(
-                                Color(0xFFFF4444).copy(alpha = 0.6f),
-                                Color(0xFFFF0000).copy(alpha = 0.3f),
-                                Color.Transparent
-                            )
-                        ),
-                        shape = CircleShape
-                    )
-            )
-        }
+        // Glow effect behind button (pulsing)
+        Box(
+            modifier = Modifier
+                .size(glowSize)
+                .graphicsLayer {
+                    scaleX = pulseScale * pressScale
+                    scaleY = pulseScale * pressScale
+                    alpha = glowAlpha
+                }
+                .background(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            glowColor.copy(alpha = 0.6f),
+                            glowColorDark.copy(alpha = 0.3f),
+                            Color.Transparent
+                        )
+                    ),
+                    shape = CircleShape
+                )
+        )
 
         // Main button - fills most of the width
         Button(
             onClick = onClick,
-            enabled = enabled,
+            enabled = !isToggling,
             modifier = Modifier
                 .size(buttonSize)
+                .graphicsLayer {
+                    scaleX = pressScale
+                    scaleY = pressScale
+                }
                 .shadow(
-                    elevation = if (enabled) 24.dp else 8.dp,
+                    elevation = 24.dp,
                     shape = CircleShape,
-                    ambientColor = if (enabled) Color(0xFFFF4444) else Color.Black,
-                    spotColor = if (enabled) Color(0xFFCC0000) else Color.Black
+                    ambientColor = glowColor,
+                    spotColor = glowColorDark
                 ),
             shape = CircleShape,
             colors = ButtonDefaults.buttonColors(
                 containerColor = Color.Transparent,
                 disabledContainerColor = Color.Transparent
             ),
-            contentPadding = PaddingValues(0.dp)
+            contentPadding = PaddingValues(0.dp),
+            interactionSource = remember { MutableInteractionSource() }.also { interactionSource ->
+                LaunchedEffect(interactionSource) {
+                    interactionSource.interactions.collect { interaction ->
+                        when (interaction) {
+                            is androidx.compose.foundation.interaction.PressInteraction.Press -> {
+                                isPressed = true
+                            }
+                            is androidx.compose.foundation.interaction.PressInteraction.Release,
+                            is androidx.compose.foundation.interaction.PressInteraction.Cancel -> {
+                                isPressed = false
+                            }
+                        }
+                    }
+                }
+            }
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(
-                        brush = if (enabled) redGradient else disabledGradient,
+                        brush = currentGradient,
                         shape = CircleShape
                     ),
                 contentAlignment = Alignment.Center
@@ -276,7 +358,7 @@ private fun MoneyButton(
                         .background(
                             brush = Brush.verticalGradient(
                                 colors = listOf(
-                                    Color.White.copy(alpha = if (enabled) 0.2f else 0.1f),
+                                    Color.White.copy(alpha = 0.25f),
                                     Color.Transparent,
                                     Color.Transparent,
                                     Color.Black.copy(alpha = 0.2f)
@@ -288,13 +370,21 @@ private fun MoneyButton(
                         ),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = stringResource(R.string.worker_button_money),
-                        fontSize = 42.sp,
-                        fontWeight = FontWeight.Black,
-                        color = if (enabled) Color.White else TextDisabled,
-                        letterSpacing = 4.sp
-                    )
+                    if (isToggling) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(48.dp),
+                            color = Color.White,
+                            strokeWidth = 4.dp
+                        )
+                    } else {
+                        Text(
+                            text = stringResource(R.string.worker_button_money),
+                            fontSize = 42.sp,
+                            fontWeight = FontWeight.Black,
+                            color = Color.White,
+                            letterSpacing = 4.sp
+                        )
+                    }
                 }
             }
         }
@@ -305,9 +395,11 @@ private fun MoneyButton(
 private fun StatsCard(
     completedTasks: Int,
     successRate: Float,
-    rating: Float
+    rating: Float,
+    onClick: () -> Unit
 ) {
     Card(
+        onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
@@ -317,12 +409,24 @@ private fun StatsCard(
         Column(
             modifier = Modifier.padding(20.dp)
         ) {
-            Text(
-                text = stringResource(R.string.worker_stats_title),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = TextPrimary
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = stringResource(R.string.worker_stats_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = TextPrimary
+                )
+                Icon(
+                    Icons.Default.ChevronRight,
+                    contentDescription = null,
+                    tint = TextTertiary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
 
             Spacer(Modifier.height(16.dp))
 

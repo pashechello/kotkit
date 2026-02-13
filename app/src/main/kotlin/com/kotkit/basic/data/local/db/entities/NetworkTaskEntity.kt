@@ -26,11 +26,11 @@ data class NetworkTaskEntity(
     val videoS3Key: String,
     val videoHash: String?,
     val videoSizeBytes: Long?,
-    val caption: String,
+    val caption: String?,
 
     // Status
     val status: String, // pending, assigned, downloading, posting, verifying, completed, failed, expired
-    val priceUsd: Float,
+    val priceRub: Float,
 
     // Timing
     val assignedAt: Long?,
@@ -48,6 +48,9 @@ data class NetworkTaskEntity(
     val errorMessage: String? = null,
     val errorType: String? = null,
     val retryCount: Int = 0,
+
+    // Thumbnail
+    val videoThumbnailUrl: String? = null, // Presigned URL from backend
 
     // Local state
     val videoLocalPath: String? = null, // Downloaded video path

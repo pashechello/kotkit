@@ -1,9 +1,13 @@
 package com.kotkit.basic.agent
 
-import android.content.ClipboardManager
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
+import androidx.core.app.NotificationCompat
 import androidx.core.content.FileProvider
 import timber.log.Timber
 import com.kotkit.basic.data.local.db.entities.PostEntity
@@ -14,13 +18,17 @@ import com.kotkit.basic.data.remote.api.models.VerifyFeedRequest
 import com.kotkit.basic.executor.accessibility.ActionExecutor
 import com.kotkit.basic.executor.accessibility.ExecutionResult
 import com.kotkit.basic.executor.accessibility.TikTokAccessibilityService
+import com.kotkit.basic.permission.AutostartHelper
+import com.kotkit.basic.ui.MainActivity
 import com.kotkit.basic.executor.accessibility.portal.UITreeParser
+import com.kotkit.basic.executor.screen.AudioMuter
 import com.kotkit.basic.executor.screen.ProximitySensor
 import com.kotkit.basic.executor.screen.ScreenUnlocker
 import com.kotkit.basic.executor.screen.ScreenWaker
 import com.kotkit.basic.executor.screen.UnlockResult
 import com.kotkit.basic.executor.screenshot.CaptureResult
 import com.kotkit.basic.executor.screenshot.ScreenshotManager
+import com.kotkit.basic.network.ErrorReporter
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,7 +47,10 @@ class PostingAgent @Inject constructor(
     private val screenWaker: ScreenWaker,
     private val proximitySensor: ProximitySensor,
     private val actionExecutor: ActionExecutor,
-    private val uiTreeParser: UITreeParser
+    private val uiTreeParser: UITreeParser,
+    private val errorReporter: ErrorReporter,
+    private val autostartHelper: AutostartHelper,
+    private val audioMuter: AudioMuter
 ) {
     companion object {
         private const val TAG = "PostingAgent"
@@ -49,7 +60,7 @@ class PostingAgent @Inject constructor(
         private const val TIKTOK_LITE_PACKAGE = "com.ss.android.ugc.trill"
         private const val FILE_PROVIDER_AUTHORITY = "com.kotkit.basic.fileprovider"
 
-        // Static reference for emergency stop from FloatingLogoService
+        // Static reference for cancellation support
         @Volatile
         private var instance: PostingAgent? = null
 
@@ -61,9 +72,9 @@ class PostingAgent @Inject constructor(
     }
 
     // Launch method tracking for backend AI
+    // NOTE: Only SHARE_INTENT supported - gallery flow removed
     enum class TikTokLaunchMethod {
-        SHARE_INTENT,    // New method - video passed directly
-        NORMAL_LAUNCH    // Legacy method - find video in gallery
+        SHARE_INTENT     // Video passed directly via Share Intent
     }
 
     // Result types for launch attempts
@@ -108,7 +119,6 @@ class PostingAgent @Inject constructor(
         val sessionId = UUID.randomUUID().toString()
         val previousActions = mutableListOf<String>()
         var launchMethod: TikTokLaunchMethod? = null
-
         // LOCAL variables for URI permission tracking - thread safe!
         var grantedVideoUri: android.net.Uri? = null
         var grantedPackageName: String? = null
@@ -144,6 +154,11 @@ class PostingAgent @Inject constructor(
             when (val unlockResult = screenUnlocker.ensureUnlocked()) {
                 is UnlockResult.Failed -> {
                     _state.value = AgentState.Failed(unlockResult.reason)
+                    errorReporter.report(
+                        errorType = "screen_unlock_failed",
+                        errorMessage = unlockResult.reason,
+                        context = mapOf("post_id" to post.id.toString())
+                    )
                     return PostResult.Failed(unlockResult.reason)
                 }
                 is UnlockResult.NeedUserAction -> {
@@ -152,6 +167,11 @@ class PostingAgent @Inject constructor(
                 }
                 is UnlockResult.NotSupported -> {
                     _state.value = AgentState.Failed(unlockResult.message)
+                    errorReporter.report(
+                        errorType = "screen_unlock_not_supported",
+                        errorMessage = unlockResult.message,
+                        context = mapOf("post_id" to post.id.toString())
+                    )
                     return PostResult.Failed(unlockResult.message)
                 }
                 else -> { /* OK */ }
@@ -160,6 +180,9 @@ class PostingAgent @Inject constructor(
 
             // Keep screen on during posting
             screenWaker.keepScreenOn()
+
+            // Mute all audio streams to prevent TikTok sounds
+            audioMuter.muteAll()
 
             // Check for cancellation before opening TikTok
             if (isCancelled) {
@@ -172,43 +195,56 @@ class PostingAgent @Inject constructor(
             val tiktokOpenStartTime = System.currentTimeMillis()
             _state.value = AgentState.OpeningTikTok
 
-            // ALWAYS try Share Intent first (primary method)
-            val finalLaunchResult: TikTokLaunchResult = run {
-                val shareResult = openTikTokWithVideo(post.videoPath)
-                Timber.tag(TAG).d("Share Intent attempt: $shareResult")
+            // OEM workaround: bring KotKit to foreground first on devices that block
+            // background activity starts (MIUI, ColorOS, FuntouchOS, etc.)
+            // Skip if user confirmed MIUI permissions are enabled - no longer needed
+            if (autostartHelper.isAutostartRequired() && !autostartHelper.isAutostartConfirmed()) {
+                Timber.tag(TAG).i("MIUI permissions not confirmed, using bringToForeground workaround")
+                bringToForeground()
+            } else if (autostartHelper.isAutostartRequired()) {
+                Timber.tag(TAG).i("MIUI permissions confirmed, launching TikTok directly")
+            }
 
-                when (shareResult) {
-                    is TikTokLaunchResult.Success -> {
-                        Timber.tag(TAG).i("TikTok opened successfully via ${shareResult.method}")
-                        shareResult
-                    }
+            // Share Intent is the ONLY supported method - no gallery fallback
+            val shareResult = openTikTokWithVideo(post.videoPath)
+            Timber.tag(TAG).d("Share Intent attempt: $shareResult")
 
-                    is TikTokLaunchResult.ShareNotSupported -> {
-                        Timber.tag(TAG).w("Share intent not supported for ${shareResult.packageName}, falling back to normal launch")
-                        val fallbackResult = openTikTokNormal()
+            val finalLaunchResult: TikTokLaunchResult = when (shareResult) {
+                is TikTokLaunchResult.Success -> {
+                    Timber.tag(TAG).i("TikTok opened successfully via Share Intent")
+                    shareResult
+                }
 
-                        if (fallbackResult !is TikTokLaunchResult.Success) {
-                            _state.value = AgentState.Failed("Both launch methods failed")
-                            return PostResult.Failed("Cannot open TikTok: $fallbackResult")
-                        }
-                        fallbackResult
-                    }
+                is TikTokLaunchResult.ShareNotSupported -> {
+                    _state.value = AgentState.Failed("Share intent not supported")
+                    errorReporter.report(
+                        errorType = "share_intent_not_supported",
+                        errorMessage = "TikTok doesn't support share intent on this device",
+                        context = mapOf("post_id" to post.id.toString(), "package" to shareResult.packageName),
+                        includeScreenshot = true
+                    )
+                    return PostResult.Failed("Share intent not supported by TikTok")
+                }
 
-                    is TikTokLaunchResult.Failed -> {
-                        Timber.tag(TAG).w("Share intent failed: ${shareResult.reason}, trying normal launch")
-                        val fallbackResult = openTikTokNormal()
+                is TikTokLaunchResult.Failed -> {
+                    _state.value = AgentState.Failed("Share intent failed: ${shareResult.reason}")
+                    errorReporter.report(
+                        errorType = "share_intent_failed",
+                        errorMessage = "Share intent failed: ${shareResult.reason}",
+                        context = mapOf("post_id" to post.id.toString(), "error" to shareResult.reason),
+                        includeScreenshot = true
+                    )
+                    return PostResult.Failed("Share intent failed: ${shareResult.reason}")
+                }
 
-                        if (fallbackResult !is TikTokLaunchResult.Success) {
-                            _state.value = AgentState.Failed("All launch methods failed")
-                            return PostResult.Failed("Cannot open TikTok: $fallbackResult")
-                        }
-                        fallbackResult
-                    }
-
-                    is TikTokLaunchResult.NotInstalled -> {
-                        _state.value = AgentState.Failed("TikTok not installed")
-                        return PostResult.Failed("TikTok not installed")
-                    }
+                is TikTokLaunchResult.NotInstalled -> {
+                    _state.value = AgentState.Failed("TikTok not installed")
+                    errorReporter.report(
+                        errorType = "tiktok_not_installed",
+                        errorMessage = "TikTok app not found on device",
+                        context = mapOf("post_id" to post.id.toString())
+                    )
+                    return PostResult.Failed("TikTok not installed")
                 }
             }
 
@@ -224,17 +260,21 @@ class PostingAgent @Inject constructor(
             Timber.tag(TAG).i("Final launch method: $launchMethod")
             Timber.tag(TAG).i("⏱️ TikTok launch intent: ${System.currentTimeMillis() - tiktokOpenStartTime}ms")
 
-            // Small delay to let the intent start processing (was 2000ms, now 500ms)
-            // waitForTikTok will handle the rest
-            val postLaunchDelayStart = System.currentTimeMillis()
-            delay(500)
-            Timber.tag(TAG).i("⏱️ Post-launch delay: ${System.currentTimeMillis() - postLaunchDelayStart}ms")
-
-            // Wait for TikTok to be ready
+            // Wait for TikTok to be ready (no fixed delay needed, waitForTikTok polls)
             val waitForTikTokStart = System.currentTimeMillis()
             _state.value = AgentState.WaitingForTikTok
             if (!waitForTikTok()) {
                 _state.value = AgentState.Failed("TikTok failed to open")
+                errorReporter.report(
+                    errorType = "tiktok_launch_failed",
+                    errorMessage = "TikTok failed to open after 15s timeout",
+                    context = mapOf(
+                        "post_id" to post.id.toString(),
+                        "launch_method" to (launchMethod?.name ?: "unknown"),
+                        "wait_time_ms" to (System.currentTimeMillis() - waitForTikTokStart).toString()
+                    ),
+                    includeScreenshot = true
+                )
                 return PostResult.Failed("TikTok failed to open")
             }
             Timber.tag(TAG).i("⏱️ Wait for TikTok foreground: ${System.currentTimeMillis() - waitForTikTokStart}ms")
@@ -258,14 +298,32 @@ class PostingAgent @Inject constructor(
                     val captureResult = screenshotManager.capture()
                     if (captureResult is CaptureResult.Failed) {
                         Timber.tag(TAG).e("Screenshot failed: ${captureResult.reason}")
+                        errorReporter.report(
+                            errorType = "screenshot_failed",
+                            errorMessage = "Screenshot capture failed: ${captureResult.reason}",
+                            context = mapOf("post_id" to post.id.toString(), "step" to step.toString())
+                        )
                         return PostResult.Failed("Screenshot failed: ${captureResult.reason}")
                     }
                     val screenshot = (captureResult as CaptureResult.Success).base64
                     Timber.tag(TAG).d("⏱️ Step $step screenshot: ${System.currentTimeMillis() - screenshotStartTime}ms")
 
+                    // Check for cancellation after screenshot
+                    if (isCancelled) {
+                        Timber.tag(TAG).w("Posting cancelled after screenshot at step $step")
+                        screenWaker.releaseWakeLock()
+                        return PostResult.Failed("Cancelled by user")
+                    }
+
                     // Get UI tree
                     val service = TikTokAccessibilityService.getInstance()
                     if (service == null) {
+                        errorReporter.report(
+                            errorType = "accessibility_disconnected",
+                            errorMessage = "Accessibility service disconnected during posting",
+                            context = mapOf("post_id" to post.id.toString(), "step" to step.toString()),
+                            includeScreenshot = true
+                        )
                         return PostResult.Failed("Accessibility service disconnected")
                     }
                     val uiTree = service.getUITree()
@@ -275,11 +333,8 @@ class PostingAgent @Inject constructor(
                         screenshot = screenshot,
                         uiTree = uiTree.toApiModel(),
                         context = AnalyzeContext(
-                            task = if (launchMethod == TikTokLaunchMethod.SHARE_INTENT) {
-                                "post_video_share"  // New flow - video already selected
-                            } else {
-                                "post_video"  // Legacy flow - need to find video in gallery
-                            },
+                            // Share Intent is the only supported flow
+                            task = "post_video_share",
                             sessionId = sessionId,
                             step = step,
                             videoFilename = post.videoPath,
@@ -293,6 +348,13 @@ class PostingAgent @Inject constructor(
                     val response = apiService.analyze(request)
                     Timber.tag(TAG).d("⏱️ Step $step API analyze: ${System.currentTimeMillis() - apiStartTime}ms")
 
+                    // Check for cancellation after API call
+                    if (isCancelled) {
+                        Timber.tag(TAG).w("Posting cancelled after API call at step $step")
+                        screenWaker.releaseWakeLock()
+                        return PostResult.Failed("Cancelled by user")
+                    }
+
                     // Execute the action
                     _state.value = AgentState.ExecutingStep(step, response.action)
                     previousActions.add("${response.action}${response.reason?.let { " ($it)" } ?: ""}")
@@ -305,42 +367,28 @@ class PostingAgent @Inject constructor(
                         screenshot
                     } else null
 
-                    // Handle read_clipboard action (Post & Check link extraction)
-                    if (response.action.equals("read_clipboard", ignoreCase = true)) {
-                        Timber.tag(TAG).i("VLM requested clipboard read, extracting video URL...")
-                        delay(300)  // Small delay to ensure clipboard is updated
-
-                        val clipboardUrl = readClipboard()
-                        if (clipboardUrl != null && isValidTikTokUrl(clipboardUrl)) {
-                            val videoId = extractVideoId(clipboardUrl)
-                            Timber.tag(TAG).i("Successfully extracted video URL: $clipboardUrl (ID: $videoId)")
-
-                            _state.value = AgentState.Completed("Video published and link extracted")
-                            screenWaker.releaseWakeLock()
-                            lockScreen()
-
-                            return PostResult.Success(
-                                message = "Video published successfully",
-                                tiktokVideoId = videoId,
-                                tiktokPostUrl = clipboardUrl
-                            )
-                        } else {
-                            Timber.tag(TAG).w("Invalid or empty clipboard: $clipboardUrl")
-                            // Continue loop, VLM will retry
-                        }
-                    }
-
-                    when (val result = actionExecutor.execute(response)) {
+                    when (val result = actionExecutor.execute(response) { isCancelled }) {
                         is ExecutionResult.Done -> {
                             _state.value = AgentState.Completed(result.message)
                             screenWaker.releaseWakeLock()
                             lockScreen()
                             return PostResult.Success(result.message)
                         }
+                        ExecutionResult.Cancelled -> {
+                            Timber.tag(TAG).w("Action cancelled by user at step $step")
+                            screenWaker.releaseWakeLock()
+                            return PostResult.Failed("Cancelled by user")
+                        }
                         is ExecutionResult.Error -> {
                             if (!result.recoverable) {
                                 _state.value = AgentState.Failed(result.message ?: "Unknown error")
                                 screenWaker.releaseWakeLock()
+                                errorReporter.report(
+                                    errorType = "action_execution_error",
+                                    errorMessage = result.message ?: "Unknown action error",
+                                    context = mapOf("post_id" to post.id.toString(), "step" to step.toString()),
+                                    includeScreenshot = true
+                                )
                                 return PostResult.Failed(result.message ?: "Unknown error")
                             }
                             // Recoverable error - continue
@@ -356,7 +404,16 @@ class PostingAgent @Inject constructor(
                         ExecutionResult.PublishTapped -> {
                             // Publish button tapped - check if screen changed (like autobot phash)
                             Timber.tag(TAG).i("Publish tapped, checking screen change...")
-                            delay(1500)  // Wait for upload to complete (reduced from 2500ms)
+
+                            // Cancellable delay - check every 100ms
+                            repeat(15) {
+                                if (isCancelled) {
+                                    Timber.tag(TAG).w("Posting cancelled during publish wait")
+                                    screenWaker.releaseWakeLock()
+                                    return PostResult.Failed("Cancelled by user")
+                                }
+                                delay(100)
+                            }
 
                             // Take new screenshot and compare
                             val afterCapture = screenshotManager.capture()
@@ -385,24 +442,59 @@ class PostingAgent @Inject constructor(
                         }
                     }
 
+                    // Check for cancellation after action execution
+                    if (isCancelled) {
+                        Timber.tag(TAG).w("Posting cancelled after action at step $step")
+                        screenWaker.releaseWakeLock()
+                        return PostResult.Failed("Cancelled by user")
+                    }
+
                     step++
                     val waitAfterMs = response.waitAfter?.toLong() ?: DEFAULT_WAIT
-                    delay(waitAfterMs)
+
+                    // Cancellable delay - check every 100ms
+                    val waitIterations = (waitAfterMs / 100).toInt()
+                    repeat(waitIterations) {
+                        if (isCancelled) {
+                            Timber.tag(TAG).w("Posting cancelled during waitAfter at step ${step-1}")
+                            screenWaker.releaseWakeLock()
+                            return PostResult.Failed("Cancelled by user")
+                        }
+                        delay(100)
+                    }
+                    // Remaining time if not divisible by 100
+                    val remainingMs = waitAfterMs % 100
+                    if (remainingMs > 0) delay(remainingMs)
+
                     Timber.tag(TAG).d("⏱️ Step ${step-1} TOTAL: ${System.currentTimeMillis() - stepStartTime}ms (waitAfter=${waitAfterMs}ms)")
 
                 } catch (e: Exception) {
                     Timber.tag(TAG).e("Error at step $step", e)
                     _state.value = AgentState.Failed("Exception: ${e.message}")
                     screenWaker.releaseWakeLock()
+                    errorReporter.report(
+                        errorType = "posting_exception",
+                        errorMessage = "Exception during posting: ${e.message}",
+                        throwable = e,
+                        context = mapOf("post_id" to post.id.toString(), "step" to step.toString()),
+                        includeScreenshot = true
+                    )
                     return PostResult.Failed("Exception: ${e.message}")
                 }
             }
 
             _state.value = AgentState.Failed("Max steps exceeded ($MAX_STEPS)")
             screenWaker.releaseWakeLock()
+            errorReporter.report(
+                errorType = "max_steps_exceeded",
+                errorMessage = "Posting loop exceeded $MAX_STEPS steps",
+                context = mapOf("post_id" to post.id.toString(), "max_steps" to MAX_STEPS.toString()),
+                includeScreenshot = true
+            )
             return PostResult.Failed("Max steps exceeded")
 
         } finally {
+            audioMuter.restoreAll()
             screenWaker.releaseWakeLock()
 
             // Revoke URI permissions granted to TikTok (package-specific)
@@ -460,6 +552,7 @@ class PostingAgent @Inject constructor(
             // SECURITY: Validate path is within allowed FileProvider directories
             val allowedPaths = listOf(
                 File(context.filesDir, "videos"),
+                File(context.filesDir, "network_videos"),
                 File(context.cacheDir, "videos"),
                 context.getExternalFilesDir(null)?.let { File(it, "videos") }
             ).filterNotNull()
@@ -539,34 +632,8 @@ class PostingAgent @Inject constructor(
      * Open TikTok normally - legacy method (fallback)
      * AI will need to find the video in gallery
      */
-    private fun openTikTokNormal(): TikTokLaunchResult {
-        val tiktokPackage = when {
-            isTikTokInstalled(TIKTOK_PACKAGE) -> TIKTOK_PACKAGE
-            isTikTokInstalled(TIKTOK_LITE_PACKAGE) -> TIKTOK_LITE_PACKAGE
-            else -> return TikTokLaunchResult.NotInstalled
-        }
-
-        val launchIntent = context.packageManager.getLaunchIntentForPackage(tiktokPackage)
-        if (launchIntent == null) {
-            Timber.tag(TAG).e("Cannot get launch intent for $tiktokPackage")
-            return TikTokLaunchResult.Failed("Cannot create launch intent")
-        }
-
-        launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        launchIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-        context.startActivity(launchIntent)
-        Timber.tag(TAG).i("✓ Opened TikTok normally (fallback): $tiktokPackage")
-        return TikTokLaunchResult.Success(TikTokLaunchMethod.NORMAL_LAUNCH, tiktokPackage)
-    }
-
-    /**
-     * Legacy method - kept for backward compatibility
-     * Redirects to openTikTokNormal()
-     */
-    private fun openTikTok(): Boolean {
-        val result = openTikTokNormal()
-        return result is TikTokLaunchResult.Success
-    }
+    // NOTE: openTikTokNormal() and openTikTok() REMOVED
+    // Share Intent is the only supported method - no gallery flow fallback
 
     /**
      * Wait for TikTok to appear in foreground after launch.
@@ -651,39 +718,6 @@ class PostingAgent @Inject constructor(
         }
     }
 
-    // ========================================================================
-    // Post & Check: Clipboard helpers for link extraction
-    // ========================================================================
-
-    private fun readClipboard(): String? {
-        return try {
-            val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            val clipData = clipboardManager.primaryClip
-            if (clipData != null && clipData.itemCount > 0) {
-                clipData.getItemAt(0)?.text?.toString()
-            } else {
-                null
-            }
-        } catch (e: Exception) {
-            Timber.tag(TAG).e("Failed to read clipboard", e)
-            null
-        }
-    }
-
-    private fun isValidTikTokUrl(url: String): Boolean {
-        val patterns = listOf(
-            Regex("""^https?://(www\.)?tiktok\.com/@[\w.]+/video/\d+""", RegexOption.IGNORE_CASE),
-            Regex("""^https?://vm\.tiktok\.com/[\w]+/?$""", RegexOption.IGNORE_CASE),
-            Regex("""^https?://vt\.tiktok\.com/[\w]+/?$""", RegexOption.IGNORE_CASE)
-        )
-        return patterns.any { it.containsMatchIn(url) }
-    }
-
-    private fun extractVideoId(url: String): String? {
-        val match = Regex("""/video/(\d+)""").find(url)
-        return match?.groupValues?.getOrNull(1)
-    }
-
     /**
      * Lock screen after successful post to save battery.
      * Uses Accessibility Service's GLOBAL_ACTION_LOCK_SCREEN (Android 9+).
@@ -691,12 +725,24 @@ class PostingAgent @Inject constructor(
      */
     private suspend fun lockScreen() {
         try {
-            // Wait for video upload to complete before locking
+            // Wait for video upload to complete before locking (cancellable)
             Timber.tag(TAG).i("Waiting 20s before locking screen (allowing upload to complete)...")
-            delay(20_000)
+            repeat(200) { // 200 * 100ms = 20s
+                if (isCancelled) {
+                    Timber.tag(TAG).w("Lock screen wait cancelled by user")
+                    return
+                }
+                delay(100)
+            }
 
             val service = TikTokAccessibilityService.getInstance()
             if (service != null) {
+                // First close TikTok app by pressing Home
+                Timber.tag(TAG).i("Closing TikTok app before locking screen...")
+                service.pressHome()
+                delay(500)  // Small delay to let Home action complete
+
+                // Then lock screen
                 val success = service.lockScreen()
                 if (success) {
                     Timber.tag(TAG).i("✓ Screen locked via Accessibility after successful publish")
@@ -709,6 +755,82 @@ class PostingAgent @Inject constructor(
         } catch (e: Exception) {
             Timber.tag(TAG).w("Failed to lock screen: ${e.message}")
             // Not critical - posting was successful
+        }
+    }
+
+    /**
+     * Bring KotKit to foreground before launching TikTok.
+     * Uses Full-Screen Intent via notification - the only way that works on MIUI
+     * where direct background activity starts are blocked.
+     */
+    private suspend fun bringToForeground() {
+        try {
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+            // Create high-priority channel for full-screen intent
+            val channelId = "foreground_launch"
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val channel = NotificationChannel(
+                    channelId,
+                    "Posting",
+                    NotificationManager.IMPORTANCE_HIGH
+                ).apply {
+                    description = "Used to bring app to foreground during posting"
+                    setSound(null, null)
+                    enableVibration(false)
+                }
+                notificationManager.createNotificationChannel(channel)
+            }
+
+            // Create intent for MainActivity
+            val fullScreenIntent = Intent(context, MainActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+                addFlags(Intent.FLAG_ACTIVITY_NO_USER_ACTION)
+            }
+
+            val fullScreenPendingIntent = PendingIntent.getActivity(
+                context,
+                0,
+                fullScreenIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            // Build notification with full-screen intent
+            val notificationId = 10070
+            val notification = NotificationCompat.Builder(context, channelId)
+                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setContentTitle("KotKit")
+                .setContentText("Posting video...")
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setCategory(NotificationCompat.CATEGORY_ALARM)
+                .setFullScreenIntent(fullScreenPendingIntent, true)
+                .setAutoCancel(true)
+                .build()
+
+            // Show notification - this triggers the full-screen intent
+            notificationManager.notify(notificationId, notification)
+            Timber.tag(TAG).i("Triggered full-screen intent notification")
+
+            delay(800)  // Wait for MainActivity to come to foreground
+
+            // Cancel the notification (activity should be visible now)
+            notificationManager.cancel(notificationId)
+            Timber.tag(TAG).i("Brought KotKit to foreground via full-screen intent")
+
+        } catch (e: Exception) {
+            Timber.tag(TAG).e(e, "Failed to bring to foreground via full-screen intent, trying direct start")
+            // Fallback to direct start (may work on non-MIUI)
+            try {
+                val intent = Intent(context, MainActivity::class.java).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+                }
+                context.startActivity(intent)
+                delay(500)
+            } catch (e2: Exception) {
+                Timber.tag(TAG).e(e2, "Direct activity start also failed")
+            }
         }
     }
 }

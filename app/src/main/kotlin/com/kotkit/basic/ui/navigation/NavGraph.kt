@@ -15,6 +15,7 @@ import com.kotkit.basic.ui.screens.settings.SettingsScreen
 import com.kotkit.basic.ui.screens.settings.UnlockSettingsScreen
 import com.kotkit.basic.ui.screens.splash.SplashScreen
 import com.kotkit.basic.ui.screens.worker.AvailableTasksScreen
+import com.kotkit.basic.ui.screens.worker.CompletedTasksScreen
 import com.kotkit.basic.ui.screens.worker.EarningsScreen
 import com.kotkit.basic.ui.screens.worker.WorkerDashboardScreen
 
@@ -31,6 +32,7 @@ sealed class Screen(val route: String) {
     // Worker Mode screens
     object WorkerDashboard : Screen("worker_dashboard")
     object AvailableTasks : Screen("available_tasks")
+    object CompletedTasks : Screen("completed_tasks")
     object Earnings : Screen("earnings")
 }
 
@@ -161,12 +163,19 @@ fun NavGraph(navController: NavHostController) {
                 onNavigateToAvailableTasks = { navController.navigate(Screen.AvailableTasks.route) },
                 onNavigateToActiveTasks = { /* Active tasks shown in dashboard */ },
                 onNavigateToEarnings = { navController.navigate(Screen.Earnings.route) },
+                onNavigateToCompletedTasks = { navController.navigate(Screen.CompletedTasks.route) },
                 onNavigateToSettings = { navController.navigate(Screen.Settings.route) }
             )
         }
 
         composable(Screen.AvailableTasks.route) {
             AvailableTasksScreen(
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Screen.CompletedTasks.route) {
+            CompletedTasksScreen(
                 onNavigateBack = { navController.popBackStack() }
             )
         }

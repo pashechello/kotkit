@@ -11,11 +11,16 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.kotkit.basic.data.remote.api.models.TaskResponse
 import com.kotkit.basic.ui.theme.*
 
@@ -137,7 +142,7 @@ private fun AvailableTaskCard(
                     color = TextSecondary
                 )
                 Text(
-                    text = "$${String.format("%.2f", task.priceUsd)}",
+                    text = "${String.format("%.2f", task.priceRub)} ₽",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = AccentGreen
@@ -146,25 +151,65 @@ private fun AvailableTaskCard(
 
             Spacer(Modifier.height(8.dp))
 
-            // Caption preview
-            Text(
-                text = task.caption,
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis
-            )
-
-            Spacer(Modifier.height(12.dp))
-
-            // Task info
+            // Thumbnail + caption row
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                TaskInfoChip(
-                    icon = Icons.Default.VideoFile,
-                    text = formatFileSize(task.videoSizeBytes ?: 0)
-                )
+                // Thumbnail
+                Box(
+                    modifier = Modifier
+                        .width(56.dp)
+                        .height(80.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(SurfaceBase),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (task.videoThumbnailUrl != null) {
+                        var isError by remember { mutableStateOf(false) }
+                        if (!isError) {
+                            AsyncImage(
+                                model = ImageRequest.Builder(LocalContext.current)
+                                    .data(task.videoThumbnailUrl)
+                                    .crossfade(true)
+                                    .build(),
+                                contentDescription = "Video preview",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop,
+                                onError = { isError = true }
+                            )
+                        } else {
+                            Icon(
+                                Icons.Default.VideoFile,
+                                contentDescription = null,
+                                modifier = Modifier.size(28.dp),
+                                tint = TextSecondary
+                            )
+                        }
+                    } else {
+                        Icon(
+                            Icons.Default.VideoFile,
+                            contentDescription = null,
+                            modifier = Modifier.size(28.dp),
+                            tint = TextSecondary
+                        )
+                    }
+                }
+
+                // Caption preview
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = task.caption ?: "",
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    TaskInfoChip(
+                        icon = Icons.Default.VideoFile,
+                        text = formatFileSize(task.videoSizeBytes ?: 0)
+                    )
+                }
             }
 
             Spacer(Modifier.height(16.dp))

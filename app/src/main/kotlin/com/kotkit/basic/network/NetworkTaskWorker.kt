@@ -33,12 +33,14 @@ class NetworkTaskWorker @AssistedInject constructor(
     private val networkTaskRepository: NetworkTaskRepository,
     private val workerRepository: WorkerRepository,
     private val networkTaskExecutor: NetworkTaskExecutor,
-    private val meowSoundService: MeowSoundService
+    private val meowSoundService: MeowSoundService,
+    private val logUploader: LogUploader
 ) : CoroutineWorker(context, params) {
 
     companion object {
         private const val TAG = "NetworkTaskWorker"
         private const val NOTIFICATION_ID = 20001
+        private const val MIN_COOLDOWN_MINUTES = 30
         const val KEY_TASK_ID = "task_id"
     }
 
@@ -70,9 +72,30 @@ class NetworkTaskWorker @AssistedInject constructor(
             return Result.failure()
         }
 
+        // Respect scheduled posting time — don't execute before scheduledFor
+        if (task.scheduledFor != null && task.scheduledFor > System.currentTimeMillis()) {
+            val waitMs = task.scheduledFor - System.currentTimeMillis()
+            val waitMin = waitMs / 1000 / 60
+            Log.w(TAG, "Task $taskId not due yet (${waitMin}min). This shouldn't happen — scheduling error. Returning failure.")
+            // Don't use Result.retry() here — it creates exponential backoff loop
+            // that blocks currentlyExecutingTaskId in NetworkWorkerService.
+            // The task will be picked up again by the polling loop when scheduledFor arrives.
+            return Result.failure()
+        }
+
+        // Cooldown: don't post if last post was less than 30 minutes ago
+        val lastCompletedAt = networkTaskRepository.getLastCompletedAt()
+        if (lastCompletedAt != null) {
+            val minutesSinceLast = (System.currentTimeMillis() - lastCompletedAt) / 1000 / 60
+            if (minutesSinceLast < MIN_COOLDOWN_MINUTES) {
+                Log.i(TAG, "Task $taskId: cooldown active, ${MIN_COOLDOWN_MINUTES - minutesSinceLast}min remaining")
+                return Result.retry()
+            }
+        }
+
         // Show foreground notification
         try {
-            setForeground(createForegroundInfo(task.caption))
+            setForeground(createForegroundInfo(task.caption ?: ""))
         } catch (e: ForegroundServiceStartNotAllowedException) {
             Log.w(TAG, "Cannot start foreground from background", e)
         } catch (e: Exception) {
@@ -85,11 +108,11 @@ class NetworkTaskWorker @AssistedInject constructor(
         }
 
         // Handle result
-        return when (result) {
+        val workResult = when (result) {
             is ExecutionResult.Success -> {
                 Log.i(TAG, "Task $taskId completed: ${result.tiktokVideoId}")
                 meowSoundService.playSuccess()
-                showCompletionNotification(true, task.priceUsd)
+                showCompletionNotification(true, task.priceRub)
                 Result.success()
             }
 
@@ -111,6 +134,17 @@ class NetworkTaskWorker @AssistedInject constructor(
                 Result.retry()
             }
         }
+
+        // Best-effort log upload after task execution
+        try {
+            val today = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+                .format(java.util.Date())
+            logUploader.uploadLog(today)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to upload log after task", e)
+        }
+
+        return workResult
     }
 
     private fun shouldRetry(errorType: String): Boolean {
@@ -143,12 +177,12 @@ class NetworkTaskWorker @AssistedInject constructor(
         }
     }
 
-    private fun showCompletionNotification(success: Boolean, earnedUsd: Float, error: String? = null) {
+    private fun showCompletionNotification(success: Boolean, earnedRub: Float, error: String? = null) {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
 
         val notification = if (success) {
             NotificationCompat.Builder(context, App.CHANNEL_POSTING)
-                .setContentTitle("Задача выполнена! +$${String.format("%.2f", earnedUsd)}")
+                .setContentTitle("Задача выполнена! +${String.format("%.2f", earnedRub)} ₽")
                 .setContentText("Заработок зачислен на ваш баланс")
                 .setSmallIcon(R.drawable.ic_check)
                 .setAutoCancel(true)

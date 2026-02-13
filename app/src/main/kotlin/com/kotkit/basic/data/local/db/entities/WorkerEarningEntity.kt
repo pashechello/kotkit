@@ -21,7 +21,7 @@ data class WorkerEarningEntity(
     val taskId: String,
     val campaignId: String,
 
-    val amountUsd: Float,
+    val amountRub: Float,
     val status: String, // pending, approved, available, paid, cancelled
 
     val createdAt: Long,

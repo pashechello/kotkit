@@ -1,10 +1,14 @@
 package com.kotkit.basic.data.remote.api
 
 import com.kotkit.basic.data.remote.api.models.*
+import okhttp3.MultipartBody
+import okhttp3.RequestBody
 import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.Multipart
 import retrofit2.http.PATCH
 import retrofit2.http.POST
+import retrofit2.http.Part
 import retrofit2.http.Path
 import retrofit2.http.Query
 
@@ -28,6 +32,12 @@ interface ApiService {
 
     @GET("api/v1/license/status")
     suspend fun getLicenseStatus(): LicenseStatus
+
+    @GET("api/v1/user/profile")
+    suspend fun getProfile(): ProfileResponse
+
+    @PATCH("api/v1/user/profile")
+    suspend fun updateProfile(@Body request: UpdateProfileRequest): ProfileResponse
 
     @POST("api/v1/analytics/event")
     suspend fun trackEvent(@Body event: AnalyticsEvent): AnalyticsEventResponse
@@ -63,6 +73,12 @@ interface ApiService {
     @GET("api/v1/workers/devices")
     suspend fun getWorkerDevices(): WorkerDeviceListResponse
 
+    @POST("api/v1/workers/heartbeat")
+    suspend fun workerHeartbeat(): WorkerHeartbeatResponse
+
+    @POST("api/v1/workers/offline")
+    suspend fun workerOffline(): WorkerOfflineResponse
+
     // ========================================================================
     // Network Mode - Task Endpoints
     // ========================================================================
@@ -75,6 +91,12 @@ interface ApiService {
 
     @POST("api/v1/tasks/{task_id}/claim")
     suspend fun claimTask(@Path("task_id") taskId: String): TaskResponse
+
+    @POST("api/v1/tasks/{task_id}/accept")
+    suspend fun acceptTask(@Path("task_id") taskId: String): TaskResponse
+
+    @GET("api/v1/tasks/reserved")
+    suspend fun getReservedTasks(): TaskListResponse
 
     @POST("api/v1/tasks/{task_id}/heartbeat")
     suspend fun sendHeartbeat(@Path("task_id") taskId: String): HeartbeatResponse
@@ -159,6 +181,13 @@ interface ApiService {
     @POST("api/v1/logs/batch")
     suspend fun reportBatchErrors(@Body request: BatchLogRequest): BatchLogResponse
 
+    @Multipart
+    @POST("api/v1/logs/upload")
+    suspend fun uploadLogFile(
+        @Part file: MultipartBody.Part,
+        @Part("date") date: RequestBody
+    ): LogUploadResponse
+
     // ========================================================================
     // Network Mode - Verification Endpoints (Post & Check anti-fraud)
     // ========================================================================
@@ -182,4 +211,16 @@ interface ApiService {
 
     @GET("api/v1/verification/stats")
     suspend fun getVerificationStats(): VerificationStatsResponse
+
+    @POST("api/v1/verification/{verification_id}/submit-url")
+    suspend fun submitVerificationUrl(
+        @Path("verification_id") verificationId: String,
+        @Body request: UrlSubmissionRequest
+    ): UrlSubmissionResponse
+
+    @GET("api/v1/verification/completed-tasks")
+    suspend fun getCompletedTasksWithVerification(
+        @Query("limit") limit: Int = 20,
+        @Query("offset") offset: Int = 0
+    ): CompletedTasksResponse
 }

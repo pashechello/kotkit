@@ -140,7 +140,7 @@ private fun BalanceCard(
             )
 
             Text(
-                text = "$${String.format("%.2f", availableBalance)}",
+                text = "${String.format("%.2f", availableBalance)} ₽",
                 style = MaterialTheme.typography.displaySmall,
                 fontWeight = FontWeight.Bold,
                 color = AccentGreen
@@ -159,7 +159,7 @@ private fun BalanceCard(
                         color = TextSecondary
                     )
                     Text(
-                        text = "$${String.format("%.2f", pendingBalance)}",
+                        text = "${String.format("%.2f", pendingBalance)} ₽",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = AccentOrange
@@ -173,7 +173,7 @@ private fun BalanceCard(
                         color = TextSecondary
                     )
                     Text(
-                        text = "$${String.format("%.2f", totalEarned)}",
+                        text = "${String.format("%.2f", totalEarned)} ₽",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -199,7 +199,7 @@ private fun BalanceCard(
             if (availableBalance < 5.0f) {
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    text = "Минимальная сумма для вывода: $5.00",
+                    text = "Минимальная сумма для вывода: 500 ₽",
                     style = MaterialTheme.typography.bodySmall,
                     color = TextSecondary
                 )
@@ -226,7 +226,7 @@ private fun MonthlyStatsCard(
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    text = "$${String.format("%.2f", todayEarned)}",
+                    text = "${String.format("%.2f", todayEarned)} ₽",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = AccentGreen
@@ -245,7 +245,7 @@ private fun MonthlyStatsCard(
 
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    text = "$${String.format("%.2f", thisMonthEarned)}",
+                    text = "${String.format("%.2f", thisMonthEarned)} ₽",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
@@ -288,7 +288,7 @@ private fun EarningItem(earning: WorkerEarningEntity) {
 
             Column(horizontalAlignment = Alignment.End) {
                 Text(
-                    text = "+$${String.format("%.2f", earning.amountUsd)}",
+                    text = "+${String.format("%.2f", earning.amountRub)} ₽",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = AccentGreen

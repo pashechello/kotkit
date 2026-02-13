@@ -1,13 +1,13 @@
 package com.kotkit.basic.security
 
 object SecurityConfig {
-    // SSL Pinning hosts
-    const val API_HOST = "kotkit.pro"
+    // SSL Pinning hosts - Updated 2026-01-29 for Fly.io backend (монолит)
+    const val API_HOST = "kotkit-app.fly.dev"
 
-    // Certificate pins (SHA-256) - kotkit.pro Let's Encrypt
-    // Generated: 2026-01-21
+    // Certificate pins (SHA-256) - kotkit-app.fly.dev
+    // Generated: 2026-01-29
     val CERTIFICATE_PINS = listOf(
-        "sha256/X1AdYvvnwl2Ykm0jWyiYyTOK/nt0NJ2MpbxPdsdcFK8=", // kotkit.pro
+        "sha256/1v+R//jEMn05LRXJ17Cs8GIiV0/In3BIqhadtHKxhn0=", // kotkit-app.fly.dev primary
         "sha256/C5+lpZ7tcVwmwQIMcRtPbsQtWLABXhQzejna0wHFr8M="  // Let's Encrypt ISRG Root X1 (backup)
     )
 

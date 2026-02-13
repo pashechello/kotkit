@@ -30,9 +30,9 @@ data class WorkerProfileEntity(
     val successRate: Float = 0f,
 
     // Earnings
-    val totalEarnedUsd: Float = 0f,
-    val pendingBalanceUsd: Float = 0f,
-    val availableBalanceUsd: Float = 0f,
+    val totalEarnedRub: Float = 0f,
+    val pendingBalanceRub: Float = 0f,
+    val availableBalanceRub: Float = 0f,
     val minPricePerPost: Float = 0f,
 
     // Timestamps

@@ -54,11 +54,19 @@ class ScreenUnlocker @Inject constructor(
         val totalStartTime = System.currentTimeMillis()
         Timber.tag(TAG).w("⏱️ ensureUnlocked: starting")
 
-        // 1. Wake screen (reduced from 500ms to 300ms)
+        // 1. Wake screen and wait for it to actually be on
         val wakeStartTime = System.currentTimeMillis()
         screenWaker.wake()
-        delay(300)
-        Timber.tag(TAG).w("⏱️ Wake + delay: ${System.currentTimeMillis() - wakeStartTime}ms")
+
+        // Poll for screen to actually be interactive (MIUI can take 500-800ms)
+        val maxWakeWaitMs = 2000L
+        val wakeCheckInterval = 50L
+        while (!screenWaker.isScreenOn() && System.currentTimeMillis() - wakeStartTime < maxWakeWaitMs) {
+            delay(wakeCheckInterval)
+        }
+        // Extra settle time for MIUI keyguard to fully initialize after screen on
+        delay(500)
+        Timber.tag(TAG).w("⏱️ Wake + delay: ${System.currentTimeMillis() - wakeStartTime}ms (screenOn=${screenWaker.isScreenOn()})")
 
         // 2. Check if locked
         val isLocked = lockManager.isLocked()
@@ -104,17 +112,29 @@ class ScreenUnlocker @Inject constructor(
         }
 
         Timber.tag(TAG).w("Entering PIN via Accessibility (length=${pin.length})")
-        val success = service.enterPin(pin)
+        val success = service.enterPin(pin, screenAlreadyAwake = true)
 
         if (!success) {
             Timber.tag(TAG).w("Failed to enter PIN via Accessibility")
             return UnlockResult.Failed("Не удалось ввести PIN. Проверьте, что экран PIN виден.")
         }
 
-        // Wait and verify unlock (500ms needed for MIUI/HyperOS slow PIN processing)
-        delay(500)
+        // Poll for unlock status (MIUI/HyperOS can take up to 3s to close keyguard)
+        val maxWaitMs = 3000L
+        val checkIntervalMs = 100L
+        val startTime = System.currentTimeMillis()
+
+        while (System.currentTimeMillis() - startTime < maxWaitMs) {
+            if (!lockManager.isLocked()) {
+                val elapsed = System.currentTimeMillis() - startTime
+                Timber.tag(TAG).w("⏱️ PIN unlock confirmed after ${elapsed}ms")
+                return UnlockResult.Success
+            }
+            delay(checkIntervalMs)
+        }
+
         val stillLocked = lockManager.isLocked()
-        Timber.tag(TAG).w("After PIN entry, stillLocked: $stillLocked")
+        Timber.tag(TAG).w("After PIN entry (${maxWaitMs}ms timeout), stillLocked: $stillLocked")
 
         return if (!stillLocked) {
             UnlockResult.Success
@@ -136,10 +156,23 @@ class ScreenUnlocker @Inject constructor(
 
         Timber.tag(TAG).w("Accessibility swipe: ($swipeX, $swipeStartY) -> ($swipeX, $swipeEndY)")
         service.swipe(swipeX, swipeStartY, swipeX, swipeEndY, SWIPE_DURATION)
-        delay(300)  // Reduced from 500ms
+
+        // Poll for unlock status (faster than fixed delay)
+        val maxWaitMs = 1500L
+        val checkIntervalMs = 100L
+        val startTime = System.currentTimeMillis()
+
+        while (System.currentTimeMillis() - startTime < maxWaitMs) {
+            if (!lockManager.isLocked()) {
+                val elapsed = System.currentTimeMillis() - startTime
+                Timber.tag(TAG).w("⏱️ Swipe unlock confirmed after ${elapsed}ms")
+                return UnlockResult.Success
+            }
+            delay(checkIntervalMs)
+        }
 
         val stillLocked = lockManager.isLocked()
-        Timber.tag(TAG).w("After swipe, stillLocked: $stillLocked")
+        Timber.tag(TAG).w("After swipe (${maxWaitMs}ms timeout), stillLocked: $stillLocked")
         return if (!stillLocked) {
             UnlockResult.Success
         } else {

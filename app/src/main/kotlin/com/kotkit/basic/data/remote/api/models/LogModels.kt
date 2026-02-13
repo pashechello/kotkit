@@ -67,3 +67,10 @@ object LogLevel {
     const val WARNING = "warning"
     const val INFO = "info"
 }
+
+// Device log upload
+data class LogUploadResponse(
+    val status: String,
+    @SerializedName("s3_key") val s3Key: String,
+    @SerializedName("size_bytes") val sizeBytes: Long
+)

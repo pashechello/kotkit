@@ -8,6 +8,8 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,9 +22,12 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.kotkit.basic.ui.theme.*
+import kotlin.math.cos
+import kotlin.math.sin
 
 /**
  * Glass Card - карточка с glassmorphism эффектом
@@ -595,6 +600,144 @@ fun GlassSettingRow(
             if (trailingContent != null) {
                 trailingContent()
             }
+        }
+    }
+}
+
+/**
+ * Gradient FAB - плавающая кнопка с анимированным градиентом и пульсирующим свечением
+ */
+@Composable
+fun GradientFAB(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    icon: ImageVector = Icons.Default.Add,
+    contentDescription: String? = null
+) {
+    var isPressed by remember { mutableStateOf(false) }
+
+    // Press animation
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.85f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "fab_scale"
+    )
+
+    // Pulsing glow animation
+    val infiniteTransition = rememberInfiniteTransition(label = "fab_glow")
+    val glowScale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.15f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1500, easing = EaseInOutSine),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "glow_scale"
+    )
+    val glowAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.6f,
+        targetValue = 0.3f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1500, easing = EaseInOutSine),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "glow_alpha"
+    )
+
+    // Rotating gradient angle
+    val rotationAngle by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(8000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "rotation"
+    )
+
+    Box(
+        modifier = modifier.size(72.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        // Outer pulsing glow
+        Box(
+            modifier = Modifier
+                .size(72.dp)
+                .scale(glowScale)
+                .blur(20.dp)
+                .background(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            BrandPink.copy(alpha = glowAlpha),
+                            BrandCyan.copy(alpha = glowAlpha * 0.5f),
+                            Color.Transparent
+                        )
+                    ),
+                    shape = CircleShape
+                )
+        )
+
+        // Main FAB button
+        Box(
+            modifier = Modifier
+                .size(64.dp)
+                .scale(scale)
+                .shadow(
+                    elevation = 12.dp,
+                    shape = CircleShape,
+                    ambientColor = BrandPink.copy(alpha = 0.5f),
+                    spotColor = BrandCyan.copy(alpha = 0.5f)
+                )
+                .clip(CircleShape)
+                .background(
+                    brush = Brush.linearGradient(
+                        colors = listOf(BrandCyan, BrandPink),
+                        start = Offset(
+                            x = cos(Math.toRadians(rotationAngle.toDouble())).toFloat() * 100,
+                            y = sin(Math.toRadians(rotationAngle.toDouble())).toFloat() * 100
+                        ),
+                        end = Offset(
+                            x = cos(Math.toRadians((rotationAngle + 180).toDouble())).toFloat() * 100,
+                            y = sin(Math.toRadians((rotationAngle + 180).toDouble())).toFloat() * 100
+                        )
+                    )
+                )
+                .border(
+                    width = 2.dp,
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = 0.4f),
+                            Color.White.copy(alpha = 0.1f)
+                        )
+                    ),
+                    shape = CircleShape
+                )
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = {
+                        isPressed = true
+                        onClick()
+                    }
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = contentDescription,
+                tint = Color.White,
+                modifier = Modifier.size(28.dp)
+            )
+        }
+    }
+
+    LaunchedEffect(isPressed) {
+        if (isPressed) {
+            kotlinx.coroutines.delay(150)
+            isPressed = false
         }
     }
 }
