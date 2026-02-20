@@ -87,6 +87,7 @@
     <string name="tiktok_username_hint">username</string>
     <string name="tiktok_username_invalid">Invalid username (letters, numbers, dots, underscores only)</string>
     <string name="tiktok_username_save">Save</string>
+    <string name="settings_tiktok_save_error">Failed to save username. Check your connection and try again.</string>
     <string name="tiktok_username_cancel">Cancel</string>
 
     <!-- Home Screen -->

@@ -87,6 +87,7 @@
     <string name="tiktok_username_hint">username</string>
     <string name="tiktok_username_invalid">Некорректное имя (только буквы, цифры, точки и подчёркивания)</string>
     <string name="tiktok_username_save">Сохранить</string>
+    <string name="settings_tiktok_save_error">Не удалось сохранить имя. Проверьте соединение и попробуйте снова.</string>
     <string name="tiktok_username_cancel">Отмена</string>
 
     <!-- Home Screen -->

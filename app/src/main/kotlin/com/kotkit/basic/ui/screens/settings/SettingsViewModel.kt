@@ -5,9 +5,13 @@ import android.os.Build
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kotkit.basic.data.local.preferences.AudiencePersonaPreferencesManager
+import com.kotkit.basic.R
+import com.kotkit.basic.auth.AuthState
+import com.kotkit.basic.auth.AuthStateManager
 import com.kotkit.basic.data.repository.AuthRepository
 import com.kotkit.basic.data.repository.SettingsRepository
 import com.kotkit.basic.data.repository.WorkerRepository
+import com.kotkit.basic.ui.components.SnackbarController
 import com.kotkit.basic.executor.accessibility.TikTokAccessibilityService
 import com.kotkit.basic.executor.screen.ScreenUnlocker
 import com.kotkit.basic.executor.screen.UnlockResult
@@ -34,6 +38,7 @@ class SettingsViewModel @Inject constructor(
     private val application: Application,
     private val settingsRepository: SettingsRepository,
     private val authRepository: AuthRepository,
+    private val authStateManager: AuthStateManager,
     private val workerRepository: WorkerRepository,
     private val exactAlarmPermissionManager: ExactAlarmPermissionManager,
     private val batteryOptimizationHelper: BatteryOptimizationHelper,
@@ -77,6 +82,19 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             workerRepository.getProfileFlow().collect { profile ->
                 _uiState.update { it.copy(tiktokUsername = profile?.tiktokUsername) }
+            }
+        }
+
+        // Observe auth state reactively — when 401 clears tokens, UI updates immediately
+        viewModelScope.launch {
+            authStateManager.authState.collect { authState ->
+                val isLoggedIn = authState is AuthState.Authenticated
+                _uiState.update { it.copy(
+                    isLoggedIn = isLoggedIn,
+                    // Close TikTok dialog if user became unauthenticated
+                    showTiktokUsernameDialog = if (!isLoggedIn) false else it.showTiktokUsernameDialog,
+                    isSavingTiktokUsername = if (!isLoggedIn) false else it.isSavingTiktokUsername
+                ) }
             }
         }
     }
@@ -270,8 +288,19 @@ class SettingsViewModel @Inject constructor(
                     showTiktokUsernameDialog = false
                 ) }
             } else {
-                Timber.tag(TAG).e(result.exceptionOrNull(), "Failed to update TikTok username")
-                _uiState.update { it.copy(isSavingTiktokUsername = false) }
+                val error = result.exceptionOrNull()
+                Timber.tag(TAG).e(error, "Failed to update TikTok username")
+                _uiState.update { it.copy(
+                    isSavingTiktokUsername = false,
+                    showTiktokUsernameDialog = false
+                ) }
+                val isAuthError = error is retrofit2.HttpException && error.code() == 401
+                val message = if (isAuthError) {
+                    application.getString(R.string.settings_tiktok_login_required)
+                } else {
+                    application.getString(R.string.settings_tiktok_save_error)
+                }
+                SnackbarController.showError(message)
             }
         }
     }
