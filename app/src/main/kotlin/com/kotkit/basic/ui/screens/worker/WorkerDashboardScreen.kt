@@ -23,7 +23,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
-import android.media.AudioAttributes
 import android.media.MediaPlayer
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.platform.LocalContext
@@ -191,9 +190,7 @@ fun WorkerDashboardScreen(
                     // MC Hammer sound for money button
                     val moneyContext = LocalContext.current
                     val moneyPlayer = remember {
-                        MediaPlayer.create(moneyContext, R.raw.money_button).also {
-                            Log.e("MONEY_SOUND", "MediaPlayer.create result: $it")
-                        }
+                        MediaPlayer.create(moneyContext, R.raw.money_button)
                     }
                     DisposableEffect(Unit) {
                         onDispose { moneyPlayer?.release() }
@@ -203,15 +200,13 @@ fun WorkerDashboardScreen(
                         isActive = uiState.isWorkerModeActive,
                         isToggling = uiState.isToggling,
                         onClick = {
-                            Log.e("MONEY_SOUND", "Button clicked! player=$moneyPlayer")
-                            try {
-                                moneyPlayer?.let { mp ->
+                            moneyPlayer?.let { mp ->
+                                try {
                                     if (mp.isPlaying) mp.seekTo(0)
                                     mp.start()
-                                    Log.e("MONEY_SOUND", "Sound started!")
+                                } catch (e: Exception) {
+                                    Log.e("MONEY_SOUND", "Error playing", e)
                                 }
-                            } catch (e: Exception) {
-                                Log.e("MONEY_SOUND", "Error playing", e)
                             }
                             viewModel.requestToggleWorkerMode()
                         }

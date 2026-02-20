@@ -136,9 +136,16 @@ class HeartbeatWorker @AssistedInject constructor(
                 val now = System.currentTimeMillis()
                 val stuckThresholdMs = 30 * 60 * 1000L  // 30 minutes
                 for (task in activeTasks) {
-                    val taskAge = now - (task.assignedAt ?: task.updatedAt ?: 0)
+                    // Use scheduledFor as baseline if set (task hasn't started yet),
+                    // otherwise fall back to assignedAt. This prevents killing tasks
+                    // that are legitimately waiting for their scheduled posting time.
+                    val baseline = maxOf(
+                        task.scheduledFor ?: 0L,
+                        task.assignedAt ?: task.updatedAt ?: 0L
+                    )
+                    val taskAge = now - baseline
                     if (taskAge > stuckThresholdMs) {
-                        Timber.tag(TAG).w("Cleaning abandoned task ${task.id} (age=${taskAge / 1000}s, status=${task.status})")
+                        Timber.tag(TAG).w("Cleaning abandoned task ${task.id} (age=${taskAge / 1000}s from baseline, status=${task.status})")
                         val result = networkTaskRepository.failTask(
                             taskId = task.id,
                             errorMessage = "Task abandoned locally (${taskAge / 60000}min)",
