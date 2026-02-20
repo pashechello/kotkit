@@ -598,6 +598,7 @@ class NetworkWorkerService : Service() {
             )
             .setStyle(NotificationCompat.BigTextStyle().bigText(bigText))
             .setPriority(NotificationCompat.PRIORITY_LOW)  // Less intrusive (no sound/vibration)
+            .setSilent(true)  // Suppress channel sound (meow) — money button has its own sound
             .build()
     }
 

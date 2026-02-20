@@ -1,5 +1,6 @@
 package com.kotkit.basic.ui.screens.worker
 
+import android.util.Log
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -22,9 +23,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import android.media.AudioAttributes
 import android.media.MediaPlayer
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.platform.LocalContext
+import timber.log.Timber
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -185,10 +188,33 @@ fun WorkerDashboardScreen(
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
+                    // MC Hammer sound for money button
+                    val moneyContext = LocalContext.current
+                    val moneyPlayer = remember {
+                        MediaPlayer.create(moneyContext, R.raw.money_button).also {
+                            Log.e("MONEY_SOUND", "MediaPlayer.create result: $it")
+                        }
+                    }
+                    DisposableEffect(Unit) {
+                        onDispose { moneyPlayer?.release() }
+                    }
+
                     MoneyButton(
                         isActive = uiState.isWorkerModeActive,
                         isToggling = uiState.isToggling,
-                        onClick = { viewModel.requestToggleWorkerMode() }
+                        onClick = {
+                            Log.e("MONEY_SOUND", "Button clicked! player=$moneyPlayer")
+                            try {
+                                moneyPlayer?.let { mp ->
+                                    if (mp.isPlaying) mp.seekTo(0)
+                                    mp.start()
+                                    Log.e("MONEY_SOUND", "Sound started!")
+                                }
+                            } catch (e: Exception) {
+                                Log.e("MONEY_SOUND", "Error playing", e)
+                            }
+                            viewModel.requestToggleWorkerMode()
+                        }
                     )
 
                     Spacer(Modifier.height(16.dp))
@@ -657,15 +683,6 @@ private fun MoneyButton(
     isToggling: Boolean,
     onClick: () -> Unit
 ) {
-    // Money sound effect
-    val context = LocalContext.current
-    val mediaPlayer = remember {
-        MediaPlayer.create(context, R.raw.money_button)
-    }
-    DisposableEffect(Unit) {
-        onDispose { mediaPlayer?.release() }
-    }
-
     // Press animation
     var isPressed by remember { mutableStateOf(false) }
     val pressScale by animateFloatAsState(
@@ -753,12 +770,7 @@ private fun MoneyButton(
 
         // Main button
         Button(
-            onClick = {
-                mediaPlayer?.let { mp ->
-                    if (mp.isPlaying) mp.seekTo(0) else mp.start()
-                }
-                onClick()
-            },
+            onClick = onClick,
             enabled = !isToggling,
             modifier = Modifier
                 .size(buttonSize)
