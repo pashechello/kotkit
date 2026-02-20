@@ -50,7 +50,9 @@ class App : Application(), Configuration.Provider {
             Timber.plant(Timber.DebugTree())
         }
 
-        Timber.i("KotKit App started, version ${BuildConfig.VERSION_NAME}")
+        Timber.tag("App").i("PROCESS START: version=${BuildConfig.VERSION_NAME}, pid=${android.os.Process.myPid()}, " +
+            "device=${Build.MANUFACTURER} ${Build.MODEL}, SDK=${Build.VERSION.SDK_INT}, " +
+            "aggressiveOEM=${com.kotkit.basic.network.ServiceResurrector.isAggressiveOem()}")
     }
 
     private fun initConscrypt() {
@@ -78,6 +80,9 @@ class App : Application(), Configuration.Provider {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val notificationManager = getSystemService(NotificationManager::class.java)
 
+            // Delete and recreate posting channel to apply sound changes
+            notificationManager.deleteNotificationChannel(CHANNEL_POSTING)
+
             val audioAttributes = AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_NOTIFICATION)
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
@@ -87,10 +92,10 @@ class App : Application(), Configuration.Provider {
             // IMPORTANCE_DEFAULT required for action buttons to be visible on some OEMs (Samsung, Xiaomi)
             val postingChannel = NotificationChannel(
                 CHANNEL_POSTING,
-                "Posting Status",
+                getString(R.string.notification_channel_posting),
                 NotificationManager.IMPORTANCE_DEFAULT
             ).apply {
-                description = "Shows status while posting to TikTok"
+                description = getString(R.string.notification_channel_posting)
                 setShowBadge(false)
                 setSound(getSoundUri(SoundType.MEOW_STARTING), audioAttributes)
             }
@@ -98,10 +103,10 @@ class App : Application(), Configuration.Provider {
             // Alerts channel - for success/error notifications
             val alertsChannel = NotificationChannel(
                 CHANNEL_ALERTS,
-                "Post Alerts",
+                getString(R.string.notification_channel_alerts),
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "Notifications for completed or failed posts"
+                description = getString(R.string.notification_channel_alerts)
                 setShowBadge(true)
                 setSound(getSoundUri(SoundType.MEOW_SUCCESS), audioAttributes)
             }
@@ -109,10 +114,10 @@ class App : Application(), Configuration.Provider {
             // Scheduled channel - reminders about upcoming posts
             val scheduledChannel = NotificationChannel(
                 CHANNEL_SCHEDULED,
-                "Scheduled Posts",
+                getString(R.string.notification_channel_scheduled),
                 NotificationManager.IMPORTANCE_DEFAULT
             ).apply {
-                description = "Reminders about scheduled posts"
+                description = getString(R.string.notification_channel_scheduled)
                 setShowBadge(false)
                 setSound(getSoundUri(SoundType.MEOW_WARNING), audioAttributes)
             }

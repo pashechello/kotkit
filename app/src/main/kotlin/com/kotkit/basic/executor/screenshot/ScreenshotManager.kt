@@ -15,8 +15,6 @@ class ScreenshotManager @Inject constructor(
 ) {
     companion object {
         private const val DEFAULT_QUALITY = 50
-        private const val MAX_WIDTH = 1080
-        private const val MAX_HEIGHT = 1920
     }
 
     suspend fun capture(quality: Int = DEFAULT_QUALITY): CaptureResult = withContext(Dispatchers.IO) {
@@ -31,13 +29,9 @@ class ScreenshotManager @Inject constructor(
                 return@withContext CaptureResult.Failed("Screenshot capture failed")
             }
 
-            // Compress for upload
-            val compressed = imageCompressor.compressForUpload(
-                bitmap,
-                quality,
-                MAX_WIDTH,
-                MAX_HEIGHT
-            )
+            // JPEG compress at original resolution (no resize!)
+            // Server-side VLM resizes for itself; coordinates must match device screen.
+            val compressed = imageCompressor.compress(bitmap, quality)
 
             // Convert to Base64
             val base64 = Base64.encodeToString(compressed, Base64.NO_WRAP)
@@ -59,12 +53,7 @@ class ScreenshotManager @Inject constructor(
 
             val bitmap = service.takeScreenshot() ?: return@withContext null
 
-            val compressed = imageCompressor.compressForUpload(
-                bitmap,
-                quality,
-                MAX_WIDTH,
-                MAX_HEIGHT
-            )
+            val compressed = imageCompressor.compress(bitmap, quality)
 
             bitmap.recycle()
 

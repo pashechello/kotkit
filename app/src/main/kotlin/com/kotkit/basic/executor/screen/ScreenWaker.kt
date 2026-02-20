@@ -2,7 +2,7 @@ package com.kotkit.basic.executor.screen
 
 import android.content.Context
 import android.os.PowerManager
-import android.util.Log
+import timber.log.Timber
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -30,20 +30,30 @@ class ScreenWaker @Inject constructor(
     /**
      * Wake the screen
      */
-    @Suppress("DEPRECATION")
+    @Suppress("DEPRECATION") // SCREEN_BRIGHT_WAKE_LOCK deprecated at API 30 but still functional
     fun wake() {
-        Log.w(TAG, "wake() called")
+        Timber.tag(TAG).w("wake() called")
         releaseWakeLock()
 
-        wakeLock = powerManager.newWakeLock(
-            PowerManager.FULL_WAKE_LOCK or
-                    PowerManager.ACQUIRE_CAUSES_WAKEUP or
-                    PowerManager.ON_AFTER_RELEASE,
-            WAKE_TAG
-        ).apply {
-            acquire(WAKE_TIMEOUT_MS)
+        try {
+            // FULL_WAKE_LOCK is silently ignored on API 26+ — use SCREEN_BRIGHT_WAKE_LOCK instead.
+            // SCREEN_BRIGHT_WAKE_LOCK keeps the screen on at full brightness, which is the correct
+            // behaviour for automation. Both FULL and SCREEN_BRIGHT are deprecated at API 30 but
+            // still functional; the proper long-term replacement is WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
+            // which requires an Activity — not applicable here.
+            wakeLock = powerManager.newWakeLock(
+                PowerManager.SCREEN_BRIGHT_WAKE_LOCK or
+                        PowerManager.ACQUIRE_CAUSES_WAKEUP or
+                        PowerManager.ON_AFTER_RELEASE,
+                WAKE_TAG
+            ).apply {
+                acquire(WAKE_TIMEOUT_MS)
+            }
+            Timber.tag(TAG).w("wake() WakeLock acquired")
+        } catch (e: SecurityException) {
+            // EMUI Power Genie may block ACQUIRE_CAUSES_WAKEUP if battery restrictions are active
+            Timber.tag(TAG).e(e, "WakeLock acquisition blocked by system — screen may not wake")
         }
-        Log.w(TAG, "wake() WakeLock acquired")
     }
 
     /**

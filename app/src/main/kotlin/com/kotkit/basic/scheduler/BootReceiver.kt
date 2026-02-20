@@ -3,9 +3,11 @@ package com.kotkit.basic.scheduler
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.util.Log
+import timber.log.Timber
 import com.kotkit.basic.data.local.db.entities.PostStatus
 import com.kotkit.basic.data.repository.PostRepository
+import com.kotkit.basic.network.NetworkWorkerService
+import com.kotkit.basic.network.ServiceResurrector
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -34,9 +36,24 @@ class BootReceiver : BroadcastReceiver() {
             return
         }
 
-        Log.i(TAG, "Device boot completed, rescheduling posts")
+        Timber.tag(TAG).i("Device boot completed, rescheduling posts")
 
         val pendingResult = goAsync()
+
+        // Restart Network Worker Mode if it was active before reboot.
+        // BOOT_COMPLETED receivers have foreground launch exemption, so startForegroundService() is safe.
+        // All AlarmManager alarms are cleared on reboot, so we must reschedule the resurrector too.
+        if (NetworkWorkerService.shouldBeRunning(context)) {
+            Timber.tag(TAG).i("Worker mode was active before reboot, restarting service + resurrector")
+            try {
+                NetworkWorkerService.start(context)
+                ServiceResurrector.schedule(context)
+                Timber.tag(TAG).i("Worker service + resurrector restarted successfully after boot")
+            } catch (e: Exception) {
+                Timber.tag(TAG).e(e, "Failed to restart worker service after boot. " +
+                    "OEM=${android.os.Build.MANUFACTURER}, SDK=${android.os.Build.VERSION.SDK_INT}")
+            }
+        }
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
@@ -45,7 +62,7 @@ class BootReceiver : BroadcastReceiver() {
                     val scheduledPosts = postRepository.getDuePosts()
                         .filter { it.status == PostStatus.SCHEDULED }
 
-                    Log.i(TAG, "Found ${scheduledPosts.size} scheduled posts to reschedule")
+                    Timber.tag(TAG).i("Found ${scheduledPosts.size} scheduled posts to reschedule")
 
                     // Reschedule each post using SmartScheduler
                     scheduledPosts.forEach { post ->
@@ -53,9 +70,9 @@ class BootReceiver : BroadcastReceiver() {
                     }
                 }
             } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
-                Log.e(TAG, "Timeout while rescheduling posts after boot", e)
+                Timber.tag(TAG).e(e, "Timeout while rescheduling posts after boot")
             } catch (e: Exception) {
-                Log.e(TAG, "Error rescheduling posts after boot", e)
+                Timber.tag(TAG).e(e, "Error rescheduling posts after boot")
             } finally {
                 pendingResult.finish()
             }

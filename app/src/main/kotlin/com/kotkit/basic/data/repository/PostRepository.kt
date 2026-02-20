@@ -1,6 +1,6 @@
 package com.kotkit.basic.data.repository
 
-import android.util.Log
+import timber.log.Timber
 import com.kotkit.basic.data.local.db.PostDao
 import com.kotkit.basic.data.local.db.entities.PostEntity
 import com.kotkit.basic.data.local.db.entities.PostStatus
@@ -44,9 +44,9 @@ class PostRepository @Inject constructor(
         // Generate thumbnail before creating post
         val thumbnailPath = thumbnailGenerator.generateThumbnail(videoPath)
         if (thumbnailPath != null) {
-            Log.i("PostRepository", "Generated thumbnail: $thumbnailPath")
+            Timber.tag("PostRepository").i("Generated thumbnail: $thumbnailPath")
         } else {
-            Log.w("PostRepository", "Failed to generate thumbnail for: $videoPath")
+            Timber.tag("PostRepository").w("Failed to generate thumbnail for: $videoPath")
         }
 
         val post = PostEntity(
@@ -91,15 +91,15 @@ class PostRepository @Inject constructor(
             if (videoFile.exists()) {
                 val deleted = videoFile.delete()
                 if (deleted) {
-                    Log.i("PostRepository", "✓ Deleted video file: ${videoFile.name}")
+                    Timber.tag("PostRepository").i("✓ Deleted video file: ${videoFile.name}")
                 } else {
-                    Log.w("PostRepository", "Failed to delete video file: $videoPath")
+                    Timber.tag("PostRepository").w("Failed to delete video file: $videoPath")
                 }
             } else {
-                Log.d("PostRepository", "Video file already deleted: $videoPath")
+                Timber.tag("PostRepository").d("Video file already deleted: $videoPath")
             }
         } catch (e: Exception) {
-            Log.e("PostRepository", "Error deleting video file: $videoPath", e)
+            Timber.tag("PostRepository").e(e, "Error deleting video file: $videoPath")
             // Don't throw - deletion failure shouldn't block other operations
         }
     }

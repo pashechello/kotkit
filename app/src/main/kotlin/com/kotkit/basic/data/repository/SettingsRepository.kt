@@ -28,13 +28,23 @@ class SettingsRepository @Inject constructor(
 
     fun savePin(pin: String) {
         keystoreManager.clearPassword() // Only one type at a time
+        keystoreManager.clearNoPinMode()
         keystoreManager.savePin(pin)
     }
 
     fun savePassword(password: String) {
         keystoreManager.clearPin() // Only one type at a time
+        keystoreManager.clearNoPinMode()
         keystoreManager.savePassword(password)
     }
+
+    fun saveNoPinMode() {
+        keystoreManager.clearPin()
+        keystoreManager.clearPassword()
+        keystoreManager.setNoPinMode(true)
+    }
+
+    fun isNoPinMode(): Boolean = keystoreManager.isNoPinMode()
 
     fun getStoredPin(): String? = keystoreManager.getStoredPin()
 
@@ -43,11 +53,6 @@ class SettingsRepository @Inject constructor(
     fun clearUnlockCredentials() {
         keystoreManager.clearAll()
     }
-
-    // Server URL
-    var serverUrl: String?
-        get() = encryptedPreferences.serverUrl
-        set(value) { encryptedPreferences.serverUrl = value }
 
     // App Language
     var appLanguage: String

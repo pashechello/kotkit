@@ -171,6 +171,9 @@ interface ApiService {
         @Query("offset") offset: Int = 0
     ): PayoutListResponse
 
+    @POST("api/v1/payouts/{payoutId}/cancel")
+    suspend fun cancelPayout(@retrofit2.http.Path("payoutId") payoutId: String): PayoutResponse
+
     // ========================================================================
     // Network Mode - Error Logging
     // ========================================================================

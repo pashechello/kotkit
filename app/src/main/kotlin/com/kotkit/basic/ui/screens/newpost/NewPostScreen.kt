@@ -1,5 +1,6 @@
 package com.kotkit.basic.ui.screens.newpost
 
+import com.kotkit.basic.ui.components.SnackbarController
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -87,7 +88,7 @@ fun NewPostScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
-    var showSnackbar by remember { mutableStateOf<String?>(null) }
+    // Snackbar messages routed to global SnackbarController
     var showAdvanced by remember { mutableStateOf(false) }
 
     // Auth state
@@ -110,17 +111,17 @@ fun NewPostScreen(
         )
     }
 
-    // Handle messages
+    // Handle messages via global SnackbarController
     LaunchedEffect(uiState.error) {
         uiState.error?.let {
-            showSnackbar = it
+            SnackbarController.showError(it)
             viewModel.clearError()
         }
     }
 
     LaunchedEffect(uiState.successMessage) {
         uiState.successMessage?.let {
-            showSnackbar = it
+            SnackbarController.showSuccess(it)
             viewModel.clearSuccess()
         }
     }
@@ -150,7 +151,7 @@ fun NewPostScreen(
                     onShowAdvancedChange = { showAdvanced = it },
                     onPickVideos = { launchVideoPicker() },
                     onNavigateBack = onNavigateBack,
-                    onShowSnackbar = { showSnackbar = it },
+                    onShowSnackbar = { SnackbarController.showError(it) },
                     isAuthenticated = isAuthenticated,
                     onLoginRequired = { reason ->
                         loginPromptReason = reason
@@ -164,7 +165,7 @@ fun NewPostScreen(
                     viewModel = viewModel,
                     onPickVideo = { launchVideoPicker() },
                     onNavigateBack = onNavigateBack,
-                    onShowSnackbar = { showSnackbar = it },
+                    onShowSnackbar = { SnackbarController.showError(it) },
                     isAuthenticated = isAuthenticated,
                     onLoginRequired = { reason ->
                         loginPromptReason = reason
@@ -210,19 +211,7 @@ fun NewPostScreen(
             }
         }
 
-        // Snackbar (top position for better visibility)
-        showSnackbar?.let { message ->
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 48.dp, start = 16.dp, end = 16.dp)
-            ) {
-                GlassSnackbar(
-                    message = message,
-                    onDismiss = { showSnackbar = null }
-                )
-            }
-        }
+        // Snackbar is now handled globally by SnackbarController in MainActivity
     }
 
     // Login prompt bottom sheet
@@ -2359,115 +2348,6 @@ private fun GlassActionCard(
             fontWeight = FontWeight.SemiBold,
             color = TextPrimary.copy(alpha = alpha)
         )
-    }
-}
-
-@Composable
-private fun GlassSnackbar(
-    message: String,
-    onDismiss: () -> Unit
-) {
-    val shape = RoundedCornerShape(16.dp)
-
-    // Glassmorphism container
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .shadow(
-                elevation = 24.dp,
-                shape = shape,
-                ambientColor = Color.Black.copy(alpha = 0.3f),
-                spotColor = Color.Black.copy(alpha = 0.3f)
-            )
-            .clip(shape)
-            .graphicsLayer {
-                // Apply blur effect for glass look (API 31+)
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-                    renderEffect = android.graphics.RenderEffect
-                        .createBlurEffect(25f, 25f, android.graphics.Shader.TileMode.CLAMP)
-                        .asComposeRenderEffect()
-                }
-            }
-    ) {
-        // Glass background with gradient
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color.White.copy(alpha = 0.15f),
-                            Color.White.copy(alpha = 0.08f)
-                        )
-                    )
-                )
-                .border(
-                    width = 1.dp,
-                    brush = Brush.verticalGradient(
-                        colors = listOf(
-                            Color.White.copy(alpha = 0.3f),
-                            Color.White.copy(alpha = 0.1f)
-                        )
-                    ),
-                    shape = shape
-                )
-        )
-
-        // Content
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.weight(1f)
-            ) {
-                // Error icon with glow
-                Box(
-                    contentAlignment = Alignment.Center
-                ) {
-                    // Glow effect
-                    Icon(
-                        Icons.Default.Error,
-                        contentDescription = null,
-                        tint = Error.copy(alpha = 0.4f),
-                        modifier = Modifier
-                            .size(28.dp)
-                            .graphicsLayer {
-                                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-                                    renderEffect = android.graphics.RenderEffect
-                                        .createBlurEffect(8f, 8f, android.graphics.Shader.TileMode.CLAMP)
-                                        .asComposeRenderEffect()
-                                }
-                            }
-                    )
-                    // Main icon
-                    Icon(
-                        Icons.Default.Error,
-                        contentDescription = null,
-                        tint = Error,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-                Text(
-                    text = message,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium,
-                    color = TextPrimary
-                )
-            }
-            IconButton(onClick = onDismiss) {
-                Icon(
-                    Icons.Default.Close,
-                    contentDescription = stringResource(R.string.dismiss),
-                    tint = TextSecondary
-                )
-            }
-        }
     }
 }
 

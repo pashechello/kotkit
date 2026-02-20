@@ -10,7 +10,7 @@ import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
-import android.util.Log
+import timber.log.Timber
 import com.kotkit.basic.data.local.preferences.EncryptedPreferences
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -92,7 +92,7 @@ class MeowSoundService @Inject constructor(
         val settings = preferences.soundSettings
 
         if (!settings.isEnabled(soundType)) {
-            Log.d(TAG, "Sound ${soundType.name} is disabled, skipping")
+            Timber.tag(TAG).d("Sound ${soundType.name} is disabled, skipping")
             return@withContext
         }
 
@@ -107,7 +107,7 @@ class MeowSoundService @Inject constructor(
                 // Create and configure MediaPlayer
                 val player = MediaPlayer.create(context, soundType.rawResId)
                 if (player == null) {
-                    Log.w(TAG, "Could not create MediaPlayer for ${soundType.name}")
+                    Timber.tag(TAG).w("Could not create MediaPlayer for ${soundType.name}")
                     return@synchronized
                 }
 
@@ -125,7 +125,7 @@ class MeowSoundService @Inject constructor(
                     }
 
                     setOnErrorListener { mp, what, extra ->
-                        Log.e(TAG, "MediaPlayer error: what=$what, extra=$extra")
+                        Timber.tag(TAG).e("MediaPlayer error: what=$what, extra=$extra")
                         synchronized(playerLock) {
                             mp.release()
                             abandonAudioFocus()
@@ -137,10 +137,10 @@ class MeowSoundService @Inject constructor(
                     start()
                 }
 
-                Log.i(TAG, "Playing sound: ${soundType.name}")
+                Timber.tag(TAG).i("Playing sound: ${soundType.name}")
 
             } catch (e: Exception) {
-                Log.e(TAG, "Error playing sound ${soundType.name}", e)
+                Timber.tag(TAG).e(e, "Error playing sound ${soundType.name}")
             }
         }
 
@@ -164,7 +164,7 @@ class MeowSoundService @Inject constructor(
         try {
             player = MediaPlayer.create(context, soundType.rawResId)
             if (player == null) {
-                Log.w(TAG, "Could not create MediaPlayer for ${soundType.name}")
+                Timber.tag(TAG).w("Could not create MediaPlayer for ${soundType.name}")
                 return
             }
 
@@ -174,7 +174,7 @@ class MeowSoundService @Inject constructor(
                 setVolume(volume, volume)
                 setOnCompletionListener { mp -> mp.release() }
                 setOnErrorListener { mp, what, extra ->
-                    Log.e(TAG, "MediaPlayer sync error: what=$what, extra=$extra")
+                    Timber.tag(TAG).e("MediaPlayer sync error: what=$what, extra=$extra")
                     mp.release()
                     true
                 }
@@ -185,7 +185,7 @@ class MeowSoundService @Inject constructor(
                 vibrate(soundType.vibrationPattern)
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error playing sound sync ${soundType.name}", e)
+            Timber.tag(TAG).e(e, "Error playing sound sync ${soundType.name}")
             player?.release()
         }
     }
@@ -238,7 +238,7 @@ class MeowSoundService @Inject constructor(
                 vibrator.vibrate(pattern, -1)
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Could not vibrate", e)
+            Timber.tag(TAG).w(e, "Could not vibrate")
         }
     }
 
@@ -250,7 +250,7 @@ class MeowSoundService @Inject constructor(
                 }
                 release()
             } catch (e: Exception) {
-                Log.w(TAG, "Error stopping current player", e)
+                Timber.tag(TAG).w(e, "Error stopping current player")
             }
         }
         currentPlayer = null
@@ -282,7 +282,7 @@ class MeowSoundService @Inject constructor(
             // Also vibrate for preview
             vibrate(soundType.vibrationPattern)
         } catch (e: Exception) {
-            Log.e(TAG, "Error previewing sound ${soundType.name}", e)
+            Timber.tag(TAG).e(e, "Error previewing sound ${soundType.name}")
         }
     }
 

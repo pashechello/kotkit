@@ -5,26 +5,19 @@ import okhttp3.CertificatePinner
 object SSLPinning {
 
     /**
-     * Get certificate pinner for API requests
-     * This prevents MITM attacks by verifying server certificates
+     * Get certificate pinner for API requests.
+     * Pins both kotkit-app.fly.dev (direct) and kotkit.pro (public domain).
      */
     fun getCertificatePinner(): CertificatePinner {
         val builder = CertificatePinner.Builder()
 
-        SecurityConfig.CERTIFICATE_PINS.forEach { pin ->
-            builder.add(SecurityConfig.API_HOST, pin)
+        // Both domains share CA pins (Let's Encrypt root + intermediate)
+        for (host in listOf(SecurityConfig.API_HOST, SecurityConfig.API_HOST_PUBLIC)) {
+            SecurityConfig.CA_PINS.forEach { pin ->
+                builder.add(host, pin)
+            }
         }
 
         return builder.build()
-    }
-
-    /**
-     * Get pins for a specific host
-     */
-    fun getPinsForHost(host: String): List<String> {
-        return when (host) {
-            SecurityConfig.API_HOST -> SecurityConfig.CERTIFICATE_PINS
-            else -> emptyList()
-        }
     }
 }

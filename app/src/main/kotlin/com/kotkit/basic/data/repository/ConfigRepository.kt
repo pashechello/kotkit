@@ -1,7 +1,7 @@
 package com.kotkit.basic.data.repository
 
 import android.content.Context
-import android.util.Log
+import timber.log.Timber
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.kotkit.basic.data.local.db.SelectorsConfigDao
@@ -57,10 +57,10 @@ class ConfigRepository @Inject constructor(
             val response = apiService.getSelectorsConfig()
             val entity = response.toEntity()
             selectorsConfigDao.insert(entity)
-            Log.i(TAG, "Selectors config fetched: version=${response.version}")
+            Timber.tag(TAG).i("Selectors config fetched: version=${response.version}")
             entity.toSelectorsConfig()
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to fetch selectors, using cached", e)
+            Timber.tag(TAG).e(e, "Failed to fetch selectors, using cached")
             // Return cached or embedded fallback
             cached?.toSelectorsConfig() ?: getEmbeddedSelectorsConfig()
         }
@@ -71,10 +71,10 @@ class ConfigRepository @Inject constructor(
             val response = apiService.getSelectorsConfig()
             val entity = response.toEntity()
             selectorsConfigDao.insert(entity)
-            Log.i(TAG, "Selectors config updated: version=${response.version}")
+            Timber.tag(TAG).i("Selectors config updated: version=${response.version}")
             Result.success(entity.toSelectorsConfig())
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to fetch selectors config", e)
+            Timber.tag(TAG).e(e, "Failed to fetch selectors config")
             Result.failure(e)
         }
     }
@@ -95,7 +95,7 @@ class ConfigRepository @Inject constructor(
                 cachedAppConfig = config
                 return config
             } catch (e: Exception) {
-                Log.w(TAG, "Failed to parse cached app config", e)
+                Timber.tag(TAG).w(e, "Failed to parse cached app config")
             }
         }
 
@@ -109,10 +109,10 @@ class ConfigRepository @Inject constructor(
             // Cache
             cachedAppConfig = config
             prefs.edit().putString(KEY_APP_CONFIG, gson.toJson(config)).apply()
-            Log.i(TAG, "App config fetched: version=${config.version}")
+            Timber.tag(TAG).i("App config fetched: version=${config.version}")
             Result.success(config)
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to fetch app config", e)
+            Timber.tag(TAG).e(e, "Failed to fetch app config")
             Result.failure(e)
         }
     }
@@ -131,7 +131,7 @@ class ConfigRepository @Inject constructor(
                 cachedFeatureFlags = flags
                 return flags
             } catch (e: Exception) {
-                Log.w(TAG, "Failed to parse cached feature flags", e)
+                Timber.tag(TAG).w(e, "Failed to parse cached feature flags")
             }
         }
 
@@ -143,10 +143,10 @@ class ConfigRepository @Inject constructor(
             val flags = apiService.getFeatureFlags()
             cachedFeatureFlags = flags
             prefs.edit().putString(KEY_FEATURE_FLAGS, gson.toJson(flags)).apply()
-            Log.i(TAG, "Feature flags fetched: ${flags.features.size} features")
+            Timber.tag(TAG).i("Feature flags fetched: ${flags.features.size} features")
             Result.success(flags)
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to fetch feature flags", e)
+            Timber.tag(TAG).e(e, "Failed to fetch feature flags")
             Result.failure(e)
         }
     }

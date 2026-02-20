@@ -9,8 +9,8 @@ data class SoundSettings(
     val soundsEnabled: Boolean = true,
 
     /** Individual sound toggles */
-    val warningEnabled: Boolean = true,
-    val startingEnabled: Boolean = true,
+    val warningEnabled: Boolean = false,
+    val startingEnabled: Boolean = false,
     val successEnabled: Boolean = true,
     val errorEnabled: Boolean = true,
     val uiSoundsEnabled: Boolean = true,

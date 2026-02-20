@@ -16,27 +16,24 @@ import com.google.gson.annotations.SerializedName
 data class TaskResponse(
     val id: String,
     @SerializedName("campaign_id") val campaignId: String,
+    @SerializedName("campaign_name") val campaignName: String? = null,
     @SerializedName("video_s3_key") val videoS3Key: String,
     @SerializedName("video_hash") val videoHash: String?,
     @SerializedName("video_size_bytes") val videoSizeBytes: Long?,
     val caption: String?,
     val status: String, // pending, assigned, downloading, posting, verifying, completed, failed, expired
     @SerializedName("price_rub") val priceRub: Float,
-    @SerializedName("assigned_worker_id") val assignedWorkerId: String?,
     @SerializedName("assigned_at") val assignedAt: Long?,
     @SerializedName("scheduled_for") val scheduledFor: Long?,
-    @SerializedName("last_heartbeat") val lastHeartbeat: Long?,
     @SerializedName("started_at") val startedAt: Long?,
     @SerializedName("completed_at") val completedAt: Long?,
+    @SerializedName("expires_at") val expiresAt: Long? = null,
     @SerializedName("tiktok_video_id") val tiktokVideoId: String?,
     @SerializedName("tiktok_post_url") val tiktokPostUrl: String?,
-    @SerializedName("proof_screenshot_s3_key") val proofScreenshotS3Key: String?,
     @SerializedName("error_message") val errorMessage: String?,
-    @SerializedName("error_type") val errorType: String?,
     @SerializedName("retry_count") val retryCount: Int,
     @SerializedName("video_thumbnail_url") val videoThumbnailUrl: String? = null,
-    @SerializedName("created_at") val createdAt: Long,
-    @SerializedName("updated_at") val updatedAt: Long?
+    @SerializedName("created_at") val createdAt: Long
 )
 
 data class TaskListResponse(
@@ -81,7 +78,7 @@ data class TaskProgressRequest(
 )
 
 data class CompleteTaskRequest(
-    @SerializedName("tiktok_video_id") val tiktokVideoId: String,
+    @SerializedName("tiktok_video_id") val tiktokVideoId: String?,
     @SerializedName("tiktok_post_url") val tiktokPostUrl: String?,
     @SerializedName("proof_screenshot_b64") val proofScreenshotB64: String? // Base64 encoded
 )

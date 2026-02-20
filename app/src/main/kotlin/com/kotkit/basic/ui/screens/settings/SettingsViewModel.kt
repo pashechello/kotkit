@@ -1,7 +1,7 @@
 package com.kotkit.basic.ui.screens.settings
 
 import android.app.Application
-import android.util.Log
+import android.os.Build
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kotkit.basic.data.local.preferences.AudiencePersonaPreferencesManager
@@ -104,12 +104,24 @@ class SettingsViewModel @Inject constructor(
                 // Light operations can stay on main thread
                 val hasStoredPin = settingsRepository.hasStoredPin()
                 val hasStoredPassword = settingsRepository.hasStoredPassword()
+                val hasNoPinMode = settingsRepository.isNoPinMode()
                 val isLoggedIn = authRepository.isLoggedIn()
                 val currentLanguage = settingsRepository.appLanguage
                 val canScheduleExactAlarms = exactAlarmPermissionManager.canScheduleExactAlarms()
-                val isAutostartRequired = autostartHelper.isAutostartRequired()
-                val isAutostartConfirmed = autostartHelper.isAutostartConfirmed()
                 val manufacturerName = autostartHelper.getManufacturerName()
+                val isAutostartRequired = autostartHelper.isAutostartRequired()
+                // Samsung Device Care on Android 11+ filters doze-whitelisted apps
+                // from "Never sleeping" picker — if battery optimization is already
+                // disabled, Samsung considers the app unrestricted, so the step is satisfied.
+                val isAutostartConfirmed = if (
+                    manufacturerName == "Samsung"
+                    && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+                    && isBatteryOptDisabled
+                ) {
+                    true
+                } else {
+                    autostartHelper.isAutostartConfirmed()
+                }
 
                 // Get user email if logged in (try API first, fallback to cache)
                 val userEmail = if (isLoggedIn) {
@@ -124,6 +136,7 @@ class SettingsViewModel @Inject constructor(
                         isAccessibilityEnabled = isAccessibilityEnabled,
                         hasStoredPin = hasStoredPin,
                         hasStoredPassword = hasStoredPassword,
+                        hasNoPinMode = hasNoPinMode,
                         isLoggedIn = isLoggedIn,
                         userEmail = userEmail,
                         currentLanguage = currentLanguage,
@@ -178,11 +191,20 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun dismissAutostartManualDialog() {
-        _uiState.update { it.copy(showAutostartManualDialog = false) }
+        // После закрытия инструкций — показываем confirm dialog
+        // чтобы пользователь мог подтвердить что включил настройку
+        _uiState.update { it.copy(
+            showAutostartManualDialog = false,
+            showAutostartConfirmDialog = true
+        ) }
     }
 
     fun getAutostartInstructions(): String {
         return autostartHelper.getInstructionsForManufacturer()
+    }
+
+    fun getAutostartChecklist(): List<String> {
+        return autostartHelper.getConfirmationChecklist()
     }
 
     fun savePin(pin: String): Boolean {
@@ -195,6 +217,12 @@ class SettingsViewModel @Inject constructor(
     fun savePassword(password: String): Boolean {
         if (password.isEmpty()) return false
         settingsRepository.savePassword(password)
+        refreshState()
+        return true
+    }
+
+    fun saveNoPinMode(): Boolean {
+        settingsRepository.saveNoPinMode()
         refreshState()
         return true
     }
@@ -253,24 +281,24 @@ class SettingsViewModel @Inject constructor(
      * User should lock the phone during countdown.
      */
     fun startTestUnlock() {
-        Log.w(TAG, "startTestUnlock: called")
+        Timber.tag(TAG).w("startTestUnlock: called")
         // Cancel any existing test
         testUnlockJob?.cancel()
         _testUnlockResult.value = null
 
         testUnlockJob = viewModelScope.launch {
-            Log.w(TAG, "startTestUnlock: starting 15 second countdown")
+            Timber.tag(TAG).w("startTestUnlock: starting 15 second countdown")
             // 15 second countdown
             for (i in 15 downTo 1) {
                 _testUnlockCountdown.value = i
                 delay(1000)
             }
             _testUnlockCountdown.value = 0
-            Log.w(TAG, "startTestUnlock: countdown finished, calling ensureUnlocked()")
+            Timber.tag(TAG).w("startTestUnlock: countdown finished, calling ensureUnlocked()")
 
             // Attempt unlock
             val result = screenUnlocker.ensureUnlocked()
-            Log.w(TAG, "startTestUnlock: ensureUnlocked returned: $result")
+            Timber.tag(TAG).w("startTestUnlock: ensureUnlocked returned: $result")
             _testUnlockResult.value = when (result) {
                 is UnlockResult.Success -> "Разблокировка успешна!"
                 is UnlockResult.AlreadyUnlocked -> "Экран уже разблокирован"
@@ -278,7 +306,7 @@ class SettingsViewModel @Inject constructor(
                 is UnlockResult.NeedUserAction -> result.message
                 is UnlockResult.NotSupported -> "Не поддерживается: ${result.message}"
             }
-            Log.w(TAG, "startTestUnlock: done, result=$_testUnlockResult")
+            Timber.tag(TAG).w("startTestUnlock: done, result=$_testUnlockResult")
 
             // Clear countdown
             _testUnlockCountdown.value = null
@@ -301,6 +329,7 @@ class SettingsViewModel @Inject constructor(
     fun clearTestUnlockResult() {
         _testUnlockResult.value = null
     }
+
 }
 
 data class SettingsUiState(
@@ -308,6 +337,7 @@ data class SettingsUiState(
     val isAccessibilityEnabled: Boolean = false,
     val hasStoredPin: Boolean = false,
     val hasStoredPassword: Boolean = false,
+    val hasNoPinMode: Boolean = false,
     val isLoggedIn: Boolean = false,
     val userEmail: String? = null,  // User's email to display when logged in
     val currentLanguage: String = "ru",

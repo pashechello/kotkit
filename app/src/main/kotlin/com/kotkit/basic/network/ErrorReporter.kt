@@ -5,7 +5,7 @@ import android.graphics.Bitmap
 import android.os.BatteryManager
 import android.os.Build
 import android.util.Base64
-import android.util.Log
+import timber.log.Timber
 import com.kotkit.basic.BuildConfig
 import com.kotkit.basic.data.remote.api.ApiService
 import com.kotkit.basic.data.remote.api.CorrelationIdInterceptor
@@ -66,7 +66,7 @@ class ErrorReporter @Inject constructor(
                     includeScreenshot = includeScreenshot
                 )
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to report error", e)
+                Timber.tag(TAG).e(e, "Failed to report error")
             }
         }
     }
@@ -110,7 +110,7 @@ class ErrorReporter @Inject constructor(
                 includeScreenshot = true
             )
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to report error with screenshot", e)
+            Timber.tag(TAG).e(e, "Failed to report error with screenshot")
         }
     }
 
@@ -148,7 +148,7 @@ class ErrorReporter @Inject constructor(
         )
 
         val response = apiService.reportError(request)
-        Log.i(TAG, "Error reported: ${response.id} ($errorType)")
+        Timber.tag(TAG).i("Error reported: ${response.id} ($errorType)")
     }
 
     private fun collectDeviceInfo(): Map<String, Any> {
@@ -189,7 +189,7 @@ class ErrorReporter @Inject constructor(
                 encodeScreenshotFile(path)
             } else null
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to capture screenshot", e)
+            Timber.tag(TAG).e(e, "Failed to capture screenshot")
             null
         }
     }
@@ -204,7 +204,7 @@ class ErrorReporter @Inject constructor(
             bitmap.compress(Bitmap.CompressFormat.JPEG, 60, stream) // Lower quality for errors
             Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP)
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to encode screenshot", e)
+            Timber.tag(TAG).e(e, "Failed to encode screenshot")
             null
         }
     }

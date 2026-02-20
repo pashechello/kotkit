@@ -1,6 +1,6 @@
 package com.kotkit.basic.fcm
 
-import android.util.Log
+import timber.log.Timber
 import com.google.firebase.messaging.FirebaseMessaging
 import com.kotkit.basic.data.repository.WorkerRepository
 import kotlinx.coroutines.CoroutineScope
@@ -37,10 +37,10 @@ class FCMTokenManager @Inject constructor(
         scope.launch {
             try {
                 val token = FirebaseMessaging.getInstance().token.await()
-                Log.i(TAG, "FCM token retrieved: ${token.take(20)}...")
+                Timber.tag(TAG).i("FCM token retrieved: ${token.take(20)}...")
                 updateToken(token)
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to get FCM token", e)
+                Timber.tag(TAG).e(e, "Failed to get FCM token")
             }
         }
     }
@@ -53,7 +53,7 @@ class FCMTokenManager @Inject constructor(
         // FIX: Synchronized block to prevent race condition
         synchronized(tokenLock) {
             if (token == currentToken) {
-                Log.d(TAG, "Token unchanged, skipping update")
+                Timber.tag(TAG).d("Token unchanged, skipping update")
                 return
             }
             currentToken = token
@@ -79,24 +79,24 @@ class FCMTokenManager @Inject constructor(
             try {
                 val success = workerRepository.registerDeviceToken(token)
                 if (success) {
-                    Log.i(TAG, "✓ FCM token registered with backend (attempt ${attempt + 1})")
+                    Timber.tag(TAG).i("✓ FCM token registered with backend (attempt ${attempt + 1})")
                     return
                 } else {
-                    Log.w(TAG, "Backend rejected token registration (attempt ${attempt + 1})")
+                    Timber.tag(TAG).w("Backend rejected token registration (attempt ${attempt + 1})")
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Error registering FCM token (attempt ${attempt + 1})", e)
+                Timber.tag(TAG).e(e, "Error registering FCM token (attempt ${attempt + 1})")
             }
 
             attempt++
             if (attempt < maxRetries) {
-                Log.d(TAG, "Retrying in ${delayMs}ms...")
+                Timber.tag(TAG).d("Retrying in ${delayMs}ms...")
                 delay(delayMs)
                 delayMs = (delayMs * 2).coerceAtMost(MAX_RETRY_DELAY_MS) // Exponential backoff with cap
             }
         }
 
-        Log.e(TAG, "Failed to register FCM token after $maxRetries attempts")
+        Timber.tag(TAG).e("Failed to register FCM token after $maxRetries attempts")
     }
 
     companion object {

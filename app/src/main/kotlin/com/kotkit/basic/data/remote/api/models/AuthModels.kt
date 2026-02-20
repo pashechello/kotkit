@@ -4,15 +4,13 @@ import com.google.gson.annotations.SerializedName
 
 data class LoginRequest(
     val email: String,
-    val password: String,
-    @SerializedName("device_id") val deviceId: String
+    val password: String
 )
 
 data class RegisterRequest(
     val email: String,
     val password: String,
-    val username: String,
-    @SerializedName("device_id") val deviceId: String
+    val name: String
 )
 
 data class AuthResponse(

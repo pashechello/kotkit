@@ -3,7 +3,7 @@ package com.kotkit.basic.network
 import android.content.Context
 import android.graphics.Bitmap
 import android.util.Base64
-import android.util.Log
+import timber.log.Timber
 import com.kotkit.basic.agent.PostResult
 import com.kotkit.basic.agent.PostingAgent
 import com.kotkit.basic.data.local.db.entities.NetworkTaskEntity
@@ -61,7 +61,7 @@ class NetworkTaskExecutor @Inject constructor(
         task: NetworkTaskEntity,
         onProgress: (ExecutionStage, Int) -> Unit = { _, _ -> }
     ): ExecutionResult {
-        Log.i(TAG, "Starting execution of task ${task.id}")
+        Timber.tag(TAG).i("Starting execution of task ${task.id}")
 
         // Duplicate video protection is handled server-side in task_scheduler.py
         // (excludes workers who already posted a task with the same video_hash).
@@ -131,7 +131,7 @@ class NetworkTaskExecutor @Inject constructor(
             onProgress(ExecutionStage.WAITING_SCREEN_OFF, 0)
 
             if (!waitForScreenOff(maxWaitMinutes = 8)) {
-                Log.w(TAG, "Screen stayed on too long for task ${task.id}, will retry later")
+                Timber.tag(TAG).w("Screen stayed on too long for task ${task.id}, will retry later")
                 return ExecutionResult.Retry(reason = "Screen stayed on for too long, posting deferred")
             }
 
@@ -196,8 +196,9 @@ class NetworkTaskExecutor @Inject constructor(
             // ====================================================================
             onProgress(ExecutionStage.COMPLETING, 0)
 
-            // Use video ID from PostResult if available, otherwise generate from timestamp
-            val tiktokVideoId = postSuccess.tiktokVideoId ?: "post_${System.currentTimeMillis()}"
+            // Use video ID/URL from PostResult if available (clipboard extraction)
+            // Otherwise null - server will discover via yt-dlp scraping
+            val tiktokVideoId = postSuccess.tiktokVideoId
             val tiktokPostUrl = postSuccess.tiktokPostUrl
 
             val completeResult = networkTaskRepository.completeTask(
@@ -209,14 +210,14 @@ class NetworkTaskExecutor @Inject constructor(
             )
 
             if (completeResult.isFailure) {
-                Log.w(TAG, "Failed to sync completion (will retry later): ${completeResult.exceptionOrNull()?.message}")
+                Timber.tag(TAG).w("Failed to sync completion (will retry later): ${completeResult.exceptionOrNull()?.message}")
                 // Task is marked locally as completed with pending sync
             } else {
                 // Sync earnings from server so foreground notification shows correct amount
                 try {
                     workerRepository.fetchEarnings()
                 } catch (e: Exception) {
-                    Log.w(TAG, "Failed to sync earnings after completion: ${e.message}")
+                    Timber.tag(TAG).w("Failed to sync earnings after completion: ${e.message}")
                 }
             }
 
@@ -226,7 +227,7 @@ class NetworkTaskExecutor @Inject constructor(
             videoDownloader.deleteVideo(task.id)
 
             onProgress(ExecutionStage.COMPLETED, 100)
-            Log.i(TAG, "Task ${task.id} completed successfully")
+            Timber.tag(TAG).i("Task ${task.id} completed successfully")
 
             return ExecutionResult.Success(
                 tiktokVideoId = tiktokVideoId,
@@ -235,7 +236,7 @@ class NetworkTaskExecutor @Inject constructor(
             )
 
         } catch (e: Exception) {
-            Log.e(TAG, "Unexpected error executing task ${task.id}", e)
+            Timber.tag(TAG).e(e, "Unexpected error executing task ${task.id}")
             return handleError(
                 task = task,
                 errorType = ErrorType.UNKNOWN_ERROR,
@@ -255,7 +256,7 @@ class NetworkTaskExecutor @Inject constructor(
         videoPath: String? = null,
         captureScreenshot: Boolean = false
     ): ExecutionResult.Failed {
-        Log.e(TAG, "Task ${task.id} failed: [$errorType] $message")
+        Timber.tag(TAG).e("Task ${task.id} failed: [$errorType] $message")
 
         // Capture error screenshot if needed
         val screenshotB64 = if (captureScreenshot) {
@@ -301,11 +302,11 @@ class NetworkTaskExecutor @Inject constructor(
     private suspend fun waitForScreenOff(maxWaitMinutes: Int = 30): Boolean {
         val conditions = PublishConditions(requireScreenOff = true)
         if (deviceStateChecker.canPublish(conditions) is PublishCheckResult.Ready) {
-            Log.i(TAG, "Screen already off, proceeding to post")
+            Timber.tag(TAG).i("Screen already off, proceeding to post")
             return true
         }
 
-        Log.i(TAG, "Screen is on, waiting up to ${maxWaitMinutes}min for screen off...")
+        Timber.tag(TAG).i("Screen is on, waiting up to ${maxWaitMinutes}min for screen off...")
 
         val maxWaitMs = maxWaitMinutes * 60_000L
         val pollIntervalMs = 5_000L
@@ -315,12 +316,12 @@ class NetworkTaskExecutor @Inject constructor(
             delay(pollIntervalMs)
             if (deviceStateChecker.canPublish(conditions) is PublishCheckResult.Ready) {
                 val elapsed = (System.currentTimeMillis() - startTime) / 1000
-                Log.i(TAG, "Screen turned off after ${elapsed}s, proceeding to post")
+                Timber.tag(TAG).i("Screen turned off after ${elapsed}s, proceeding to post")
                 return true
             }
         }
 
-        Log.w(TAG, "Screen stayed on for ${maxWaitMinutes}min, giving up")
+        Timber.tag(TAG).w("Screen stayed on for ${maxWaitMinutes}min, giving up")
         return false
     }
 
@@ -338,7 +339,7 @@ class NetworkTaskExecutor @Inject constructor(
                 bitmap.recycle()
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to encode screenshot", e)
+            Timber.tag(TAG).e(e, "Failed to encode screenshot")
             null
         }
     }
@@ -362,7 +363,7 @@ enum class ExecutionStage {
  */
 sealed class ExecutionResult {
     data class Success(
-        val tiktokVideoId: String,
+        val tiktokVideoId: String?,
         val tiktokPostUrl: String?,
         val screenshotPath: String?
     ) : ExecutionResult()

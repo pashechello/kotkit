@@ -1,7 +1,7 @@
 package com.kotkit.basic.network
 
 import android.content.Context
-import android.util.Log
+import timber.log.Timber
 import androidx.hilt.work.HiltWorker
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
@@ -36,11 +36,11 @@ class TaskFetchWorker @AssistedInject constructor(
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
-        Log.d(TAG, "TaskFetchWorker running (tags: ${tags.joinToString()})")
+        Timber.tag(TAG).d("TaskFetchWorker running (tags: ${tags.joinToString()})")
 
         // Check worker mode active
         if (!workerRepository.isWorkerActive()) {
-            Log.d(TAG, "Worker mode not active, skipping")
+            Timber.tag(TAG).d("Worker mode not active, skipping")
             return Result.success()
         }
 
@@ -50,33 +50,33 @@ class TaskFetchWorker @AssistedInject constructor(
 
             val tasks = result.getOrNull()
             if (tasks == null) {
-                Log.w(TAG, "Failed to fetch tasks: ${result.exceptionOrNull()?.message}")
+                Timber.tag(TAG).w("Failed to fetch tasks: ${result.exceptionOrNull()?.message}")
                 return Result.retry()
             }
 
             if (tasks.isEmpty()) {
-                Log.d(TAG, "No tasks available")
+                Timber.tag(TAG).d("No tasks available")
                 return Result.success()
             }
 
-            Log.i(TAG, "Found ${tasks.size} available tasks")
+            Timber.tag(TAG).i("Found ${tasks.size} available tasks")
 
             // Auto-claim first task that's NOT already in local DB
             for (task in tasks) {
                 val existing = networkTaskRepository.getTaskById(task.id)
                 if (existing != null) {
-                    Log.d(TAG, "Task ${task.id} already in local DB (status=${existing.status}), skipping")
+                    Timber.tag(TAG).d("Task ${task.id} already in local DB (status=${existing.status}), skipping")
                     continue
                 }
 
                 val claimResult = networkTaskRepository.claimTask(task.id)
                 claimResult.onSuccess { claimed ->
-                    Log.i(TAG, "Auto-claimed task: ${claimed.id} (scheduledFor=${claimed.scheduledFor})")
+                    Timber.tag(TAG).i("Auto-claimed task: ${claimed.id} (scheduledFor=${claimed.scheduledFor})")
                     // Schedule execution directly via WorkManager
                     // (don't rely on NetworkWorkerService polling - MIUI may kill it)
                     scheduleExecution(claimed.id, claimed.scheduledFor)
                 }.onFailure { e ->
-                    Log.d(TAG, "Could not claim task ${task.id}: ${e.message}")
+                    Timber.tag(TAG).d("Could not claim task ${task.id}: ${e.message}")
                 }
                 break // Only claim one task per cycle
             }
@@ -84,7 +84,7 @@ class TaskFetchWorker @AssistedInject constructor(
             return Result.success()
 
         } catch (e: Exception) {
-            Log.e(TAG, "Task fetch failed", e)
+            Timber.tag(TAG).e(e, "Task fetch failed")
             return Result.retry()
         }
     }
@@ -106,7 +106,7 @@ class TaskFetchWorker @AssistedInject constructor(
         if (scheduledFor != null && scheduledFor > System.currentTimeMillis()) {
             val delayMs = scheduledFor - System.currentTimeMillis()
             requestBuilder.setInitialDelay(delayMs, java.util.concurrent.TimeUnit.MILLISECONDS)
-            Log.i(TAG, "Task $taskId delayed by ${delayMs / 1000 / 60}min (scheduledFor=$scheduledFor)")
+            Timber.tag(TAG).i("Task $taskId delayed by ${delayMs / 1000 / 60}min (scheduledFor=$scheduledFor)")
         }
 
         workManager.enqueueUniqueWork(
@@ -114,7 +114,7 @@ class TaskFetchWorker @AssistedInject constructor(
             ExistingWorkPolicy.KEEP,
             requestBuilder.build()
         )
-        Log.i(TAG, "Scheduled execution for claimed task $taskId")
+        Timber.tag(TAG).i("Scheduled execution for claimed task $taskId")
     }
 
     companion object {

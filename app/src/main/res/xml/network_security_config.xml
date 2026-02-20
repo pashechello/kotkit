@@ -24,14 +24,15 @@
         </trust-anchors>
     </base-config>
 
-    <!-- API domain with certificate pinning -->
+    <!-- API domain with certificate pinning (CA-level, survives leaf cert rotation) -->
     <domain-config cleartextTrafficPermitted="false">
         <domain includeSubdomains="true">kotkit.pro</domain>
-        <pin-set expiration="2027-01-21">
-            <!-- kotkit.pro Let's Encrypt certificate -->
-            <pin digest="SHA-256">X1AdYvvnwl2Ykm0jWyiYyTOK/nt0NJ2MpbxPdsdcFK8=</pin>
-            <!-- Let's Encrypt ISRG Root X1 (backup) -->
+        <domain includeSubdomains="true">kotkit-app.fly.dev</domain>
+        <pin-set expiration="2030-01-01">
+            <!-- ISRG Root X1 (Let's Encrypt root, valid until 2035) -->
             <pin digest="SHA-256">C5+lpZ7tcVwmwQIMcRtPbsQtWLABXhQzejna0wHFr8M=</pin>
+            <!-- Let's Encrypt E7 intermediate (current active) -->
+            <pin digest="SHA-256">y7xVm0TVJNahMr2sZydE2jQH8SquXV9yLF9seROHHHU=</pin>
         </pin-set>
     </domain-config>
 </network-security-config>

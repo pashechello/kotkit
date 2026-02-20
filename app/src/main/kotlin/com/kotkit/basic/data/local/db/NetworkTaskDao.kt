@@ -147,7 +147,7 @@ interface NetworkTaskDao {
     """)
     suspend fun markCompleted(
         id: String,
-        videoId: String,
+        videoId: String?,
         postUrl: String?,
         screenshotPath: String?,
         completedAt: Long = System.currentTimeMillis(),

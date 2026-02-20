@@ -16,6 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.kotkit.basic.data.local.db.entities.WorkerEarningEntity
+import com.kotkit.basic.ui.components.SnackbarController
 import com.kotkit.basic.ui.theme.*
 import java.time.Instant
 import java.time.ZoneId
@@ -30,17 +31,14 @@ fun EarningsScreen(
     viewModel: EarningsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val snackbarHostState = remember { SnackbarHostState() }
-
     LaunchedEffect(uiState.error) {
         uiState.error?.let { error ->
-            snackbarHostState.showSnackbar(error)
+            SnackbarController.showError(error)
             viewModel.clearError()
         }
     }
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Заработок") },

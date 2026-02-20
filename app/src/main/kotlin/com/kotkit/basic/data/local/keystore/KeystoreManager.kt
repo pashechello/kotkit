@@ -19,6 +19,7 @@ class KeystoreManager(private val context: Context) {
         private const val PREFS_NAME = "autoposter_secure_prefs"
         private const val KEY_PIN = "encrypted_pin"
         private const val KEY_PASSWORD = "encrypted_password"
+        private const val KEY_NO_PIN = "no_pin_mode"
         private const val GCM_TAG_LENGTH = 128
         private const val GCM_IV_LENGTH = 12
     }
@@ -85,12 +86,22 @@ class KeystoreManager(private val context: Context) {
         getPrefs().edit().remove(KEY_PASSWORD).apply()
     }
 
+    fun setNoPinMode(enabled: Boolean) {
+        getPrefs().edit().putBoolean(KEY_NO_PIN, enabled).apply()
+    }
+
+    fun isNoPinMode(): Boolean = getPrefs().getBoolean(KEY_NO_PIN, false)
+
+    fun clearNoPinMode() {
+        getPrefs().edit().remove(KEY_NO_PIN).apply()
+    }
+
     fun clearAll() {
         getPrefs().edit().clear().apply()
     }
 
     fun hasUnlockCredentials(): Boolean {
-        return hasStoredPin() || hasStoredPassword()
+        return hasStoredPin() || hasStoredPassword() || isNoPinMode()
     }
 
     private fun encrypt(plaintext: String): String {

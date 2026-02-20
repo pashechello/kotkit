@@ -53,6 +53,9 @@ class AudioMuter @Inject constructor(
         } catch (e: SecurityException) {
             // MIUI/Android requires DND access permission to change some stream volumes
             Timber.tag(TAG).w("Cannot mute: ${e.message} (DND access needed)")
+        } catch (e: Exception) {
+            // EMUI: IllegalArgumentException for STREAM_NOTIFICATION under notification policy
+            Timber.tag(TAG).w("Cannot mute stream (${e.javaClass.simpleName}): ${e.message}")
         }
     }
 
@@ -66,6 +69,8 @@ class AudioMuter @Inject constructor(
             Timber.tag(TAG).i("Restored all streams: $volumes")
         } catch (e: SecurityException) {
             Timber.tag(TAG).w("Cannot restore: ${e.message}")
+        } catch (e: Exception) {
+            Timber.tag(TAG).w("Cannot restore stream (${e.javaClass.simpleName}): ${e.message}")
         }
         savedVolumes = null
     }

@@ -2,7 +2,7 @@ package com.kotkit.basic.network
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.util.Log
+import timber.log.Timber
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -45,16 +45,16 @@ class ScreenshotManager @Inject constructor(
             // after successful posting
 
             if (screenshotFile.exists()) {
-                Log.i(TAG, "Screenshot already exists for task $taskId")
+                Timber.tag(TAG).i("Screenshot already exists for task $taskId")
                 return@withContext screenshotFile.absolutePath
             }
 
             // Return null - screenshot should be saved by PostingAgent
-            Log.d(TAG, "No screenshot available for task $taskId")
+            Timber.tag(TAG).d("No screenshot available for task $taskId")
             null
 
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to capture screenshot for task $taskId", e)
+            Timber.tag(TAG).e(e, "Failed to capture screenshot for task $taskId")
             null
         }
     }
@@ -72,11 +72,11 @@ class ScreenshotManager @Inject constructor(
                 bitmap.compress(Bitmap.CompressFormat.JPEG, QUALITY, out)
             }
 
-            Log.i(TAG, "Screenshot saved for task $taskId: ${file.absolutePath}")
+            Timber.tag(TAG).i("Screenshot saved for task $taskId: ${file.absolutePath}")
             file.absolutePath
 
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to save screenshot for task $taskId", e)
+            Timber.tag(TAG).e(e, "Failed to save screenshot for task $taskId")
             null
         }
     }
@@ -122,7 +122,7 @@ class ScreenshotManager @Inject constructor(
         dir.listFiles()?.forEach { file ->
             if (file.lastModified() < cutoff) {
                 if (file.delete()) {
-                    Log.i(TAG, "Cleaned up old screenshot: ${file.name}")
+                    Timber.tag(TAG).i("Cleaned up old screenshot: ${file.name}")
                 }
             }
         }

@@ -37,6 +37,7 @@ import java.io.File
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.random.Random
 
 @Singleton
 class PostingAgent @Inject constructor(
@@ -55,7 +56,8 @@ class PostingAgent @Inject constructor(
     companion object {
         private const val TAG = "PostingAgent"
         private const val MAX_STEPS = 50
-        private const val DEFAULT_WAIT = 500L
+        private const val DEFAULT_WAIT_MIN = 400L
+        private const val DEFAULT_WAIT_MAX = 1200L
         private const val TIKTOK_PACKAGE = "com.zhiliaoapp.musically"
         private const val TIKTOK_LITE_PACKAGE = "com.ss.android.ugc.trill"
         private const val FILE_PROVIDER_AUTHORITY = "com.kotkit.basic.fileprovider"
@@ -191,7 +193,19 @@ class PostingAgent @Inject constructor(
                 return PostResult.Failed("Cancelled by user")
             }
 
-            // 3. Open TikTok with automatic fallback
+            // 3. Pre-launch delay: simulate user finishing what they were doing
+            // A real user doesn't instantly open TikTok the moment they wake their phone
+            val preLaunchDelayMs = Random.nextLong(1000, 4000)
+            Timber.tag(TAG).i("Pre-launch humanization delay: ${preLaunchDelayMs}ms")
+            repeat((preLaunchDelayMs / 100).toInt()) {
+                if (isCancelled) {
+                    screenWaker.releaseWakeLock()
+                    return PostResult.Failed("Cancelled by user")
+                }
+                delay(100)
+            }
+
+            // 4. Open TikTok
             val tiktokOpenStartTime = System.currentTimeMillis()
             _state.value = AgentState.OpeningTikTok
 
@@ -293,14 +307,27 @@ class PostingAgent @Inject constructor(
                     val stepStartTime = System.currentTimeMillis()
                     _state.value = AgentState.WaitingForServer(step)
 
-                    // Take screenshot
+                    // Take screenshot (with retry — MIUI can return null on first attempt)
                     val screenshotStartTime = System.currentTimeMillis()
-                    val captureResult = screenshotManager.capture()
+                    val maxScreenshotRetries = 3
+                    var captureResult: CaptureResult = CaptureResult.Failed("Not attempted")
+                    for (attempt in 1..maxScreenshotRetries) {
+                        // On step 0 first attempt, give TikTok extra time to render
+                        if (step == 0 && attempt == 1) {
+                            delay(500)
+                        }
+                        captureResult = screenshotManager.capture()
+                        if (captureResult is CaptureResult.Success) break
+                        if (attempt < maxScreenshotRetries) {
+                            Timber.tag(TAG).w("Screenshot attempt $attempt/$maxScreenshotRetries failed: ${(captureResult as CaptureResult.Failed).reason}, retrying in ${attempt * 1000}ms...")
+                            delay(attempt * 1000L)
+                        }
+                    }
                     if (captureResult is CaptureResult.Failed) {
-                        Timber.tag(TAG).e("Screenshot failed: ${captureResult.reason}")
+                        Timber.tag(TAG).e("Screenshot failed after $maxScreenshotRetries attempts: ${captureResult.reason}")
                         errorReporter.report(
                             errorType = "screenshot_failed",
-                            errorMessage = "Screenshot capture failed: ${captureResult.reason}",
+                            errorMessage = "Screenshot capture failed after $maxScreenshotRetries attempts: ${captureResult.reason}",
                             context = mapOf("post_id" to post.id.toString(), "step" to step.toString())
                         )
                         return PostResult.Failed("Screenshot failed: ${captureResult.reason}")
@@ -315,8 +342,8 @@ class PostingAgent @Inject constructor(
                         return PostResult.Failed("Cancelled by user")
                     }
 
-                    // Get UI tree
-                    val service = TikTokAccessibilityService.getInstance()
+                    // Get UI tree (with retry if sparse — screen may still be loading after transition)
+                    var service = TikTokAccessibilityService.getInstance()
                     if (service == null) {
                         errorReporter.report(
                             errorType = "accessibility_disconnected",
@@ -326,11 +353,32 @@ class PostingAgent @Inject constructor(
                         )
                         return PostResult.Failed("Accessibility service disconnected")
                     }
-                    val uiTree = service.getUITree()
+                    var uiTree = service.getUITree()
+                    var currentScreenshot = screenshot
+                    val minPortalElements = 5
+                    if (uiTree.elements.size < minPortalElements) {
+                        Timber.tag(TAG).w("Step $step UI tree sparse: ${uiTree.elements.size} elements, waiting for screen to load...")
+                        for (retryAttempt in 1..3) {
+                            delay(800L * retryAttempt)
+                            service = TikTokAccessibilityService.getInstance() ?: break
+                            uiTree = service.getUITree()
+                            if (uiTree.elements.size >= minPortalElements) {
+                                // Re-capture screenshot too (screen has changed since transition)
+                                val reCapture = screenshotManager.capture()
+                                if (reCapture is CaptureResult.Success) {
+                                    currentScreenshot = reCapture.base64
+                                }
+                                Timber.tag(TAG).i("Step $step UI tree recovered after ${retryAttempt} retries: ${uiTree.elements.size} elements")
+                                break
+                            }
+                            Timber.tag(TAG).w("Step $step UI tree retry $retryAttempt/3: still ${uiTree.elements.size} elements")
+                        }
+                    }
+                    Timber.tag(TAG).i("Step $step UI tree: ${uiTree.elements.size} elements (pkg=${uiTree.packageName})")
 
                     // Send to server for analysis
                     val request = AnalyzeRequest(
-                        screenshot = screenshot,
+                        screenshot = currentScreenshot,
                         uiTree = uiTree.toApiModel(),
                         context = AnalyzeContext(
                             // Share Intent is the only supported flow
@@ -359,7 +407,8 @@ class PostingAgent @Inject constructor(
                     _state.value = AgentState.ExecutingStep(step, response.action)
                     previousActions.add("${response.action}${response.reason?.let { " ($it)" } ?: ""}")
 
-                    Timber.tag(TAG).d("Step $step: ${response.action} - ${response.reason}")
+                    Timber.tag(TAG).d("Step $step: ${response.action} - ${response.reason}" +
+                        (response.resolutionMethod?.let { " [CASCADE: $it]" } ?: ""))
 
                     // Save screenshot BEFORE publish action for screen change detection
                     val screenshotBeforePublish: String? = if (response.isPublishAction) {
@@ -450,7 +499,16 @@ class PostingAgent @Inject constructor(
                     }
 
                     step++
-                    val waitAfterMs = response.waitAfter?.toLong() ?: DEFAULT_WAIT
+                    // Randomize wait time: if VLM provided a value, add ±30% jitter;
+                    // otherwise use random value in DEFAULT_WAIT_MIN..DEFAULT_WAIT_MAX
+                    val baseWait = response.waitAfter?.toLong()
+                    val waitAfterMs = if (baseWait != null && baseWait > 0) {
+                        val jitter = (baseWait * 0.3).toLong()
+                        Random.nextLong(baseWait - jitter, baseWait + jitter + 1)
+                            .coerceAtLeast(DEFAULT_WAIT_MIN)
+                    } else {
+                        Random.nextLong(DEFAULT_WAIT_MIN, DEFAULT_WAIT_MAX + 1)
+                    }
 
                     // Cancellable delay - check every 100ms
                     val waitIterations = (waitAfterMs / 100).toInt()
@@ -721,13 +779,14 @@ class PostingAgent @Inject constructor(
     /**
      * Lock screen after successful post to save battery.
      * Uses Accessibility Service's GLOBAL_ACTION_LOCK_SCREEN (Android 9+).
-     * Waits before locking to allow video upload to complete.
+     * Includes post-publish browsing to simulate natural human behavior.
      */
     private suspend fun lockScreen() {
         try {
-            // Wait for video upload to complete before locking (cancellable)
-            Timber.tag(TAG).i("Waiting 20s before locking screen (allowing upload to complete)...")
-            repeat(200) { // 200 * 100ms = 20s
+            // Wait for video upload to complete (cancellable, randomized 15-25s)
+            val uploadWaitMs = Random.nextLong(15000, 25000)
+            Timber.tag(TAG).i("Waiting ${uploadWaitMs}ms for upload to complete...")
+            repeat((uploadWaitMs / 100).toInt()) {
                 if (isCancelled) {
                     Timber.tag(TAG).w("Lock screen wait cancelled by user")
                     return
@@ -736,11 +795,46 @@ class PostingAgent @Inject constructor(
             }
 
             val service = TikTokAccessibilityService.getInstance()
+
+            // Post-publish browsing: 35% chance to scroll feed like a real user
+            // who checks that their video posted and browses a bit
+            if (service != null && Random.nextFloat() < 0.35f) {
+                val scrollCount = Random.nextInt(1, 4)  // 1-3 swipes
+                Timber.tag(TAG).i("Post-publish browsing: scrolling feed $scrollCount times")
+
+                // Use proportional coordinates based on actual screen size
+                val displayMetrics = context.resources.displayMetrics
+                val screenWidth = displayMetrics.widthPixels
+                val screenHeight = displayMetrics.heightPixels
+
+                repeat(scrollCount) { i ->
+                    if (isCancelled) return
+
+                    // Swipe up on feed (proportional coordinates + randomization)
+                    val startX = Random.nextInt(screenWidth / 5, screenWidth / 2)
+                    val startY = Random.nextInt((screenHeight * 0.72).toInt(), (screenHeight * 0.85).toInt())
+                    val endX = startX + Random.nextInt(-30, 30)
+                    val endY = Random.nextInt((screenHeight * 0.2).toInt(), (screenHeight * 0.35).toInt())
+                    val duration = Random.nextLong(250, 450)
+
+                    service.swipe(startX, startY, endX, endY, duration)
+
+                    // Watch the video for 2-6 seconds (random, like a real person)
+                    val watchTimeMs = Random.nextLong(2000, 6000)
+                    repeat((watchTimeMs / 100).toInt()) {
+                        if (isCancelled) return
+                        delay(100)
+                    }
+
+                    Timber.tag(TAG).d("Post-publish browse ${i + 1}/$scrollCount done (watched ${watchTimeMs}ms)")
+                }
+            }
+
             if (service != null) {
-                // First close TikTok app by pressing Home
+                // Close TikTok app by pressing Home
                 Timber.tag(TAG).i("Closing TikTok app before locking screen...")
                 service.pressHome()
-                delay(500)  // Small delay to let Home action complete
+                delay(500)
 
                 // Then lock screen
                 val success = service.lockScreen()

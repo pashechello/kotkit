@@ -18,7 +18,10 @@ data class BalanceResponse(
     @SerializedName("pending_balance") val pendingBalance: Float,
     @SerializedName("available_balance") val availableBalance: Float,
     @SerializedName("total_earned") val totalEarned: Float,
-    @SerializedName("min_payout_amount") val minPayoutAmount: Float
+    @SerializedName("min_payout_amount") val minPayoutAmount: Float,
+    @SerializedName("referral_commission_pending") val referralCommissionPending: Float = 0f,
+    @SerializedName("referral_commission_available") val referralCommissionAvailable: Float = 0f,
+    @SerializedName("total_referral_earnings") val totalReferralEarnings: Float = 0f
 )
 
 // ============================================================================
@@ -72,7 +75,8 @@ data class PayoutResponse(
     @SerializedName("amount_currency") val amountCurrency: Float?,
     val method: String,
     @SerializedName("wallet_address") val walletAddress: String,
-    val status: String, // pending, processing, completed, failed, cancelled
+    val status: String, // pending, processing, completed, failed, cancelled, rejected
+    @SerializedName("admin_comment") val adminComment: String?,
     @SerializedName("transaction_id") val transactionId: String?,
     @SerializedName("transaction_hash") val transactionHash: String?,
     @SerializedName("error_message") val errorMessage: String?,
@@ -108,12 +112,15 @@ object PayoutStatus {
     const val COMPLETED = "completed"
     const val FAILED = "failed"
     const val CANCELLED = "cancelled"
+    const val REJECTED = "rejected"
 }
 
 object EarningStatus {
+    const val PENDING_VERIFICATION = "pending_verification"
     const val PENDING = "pending"
     const val APPROVED = "approved"
     const val AVAILABLE = "available"
     const val PAID = "paid"
     const val CANCELLED = "cancelled"
+    const val FORFEITED = "forfeited"
 }

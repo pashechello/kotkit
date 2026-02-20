@@ -1,7 +1,7 @@
 package com.kotkit.basic.network
 
 import android.content.Context
-import android.util.Log
+import timber.log.Timber
 import androidx.work.Constraints
 import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
@@ -29,7 +29,7 @@ class NetworkTaskCoordinator @Inject constructor(
      * @param reason Source of trigger (for analytics)
      */
     fun triggerTaskCheck(immediate: Boolean = true, reason: String = "unknown") {
-        Log.i(TAG, "Triggering task check: immediate=$immediate, reason=$reason")
+        Timber.tag(TAG).i("Triggering task check: immediate=$immediate, reason=$reason")
 
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
@@ -47,7 +47,7 @@ class NetworkTaskCoordinator @Inject constructor(
             request
         )
 
-        Log.d(TAG, "Task check scheduled (reason: $reason)")
+        Timber.tag(TAG).d("Task check scheduled (reason: $reason)")
     }
 
     companion object {

@@ -17,6 +17,7 @@ import com.kotkit.basic.ui.screens.splash.SplashScreen
 import com.kotkit.basic.ui.screens.worker.AvailableTasksScreen
 import com.kotkit.basic.ui.screens.worker.CompletedTasksScreen
 import com.kotkit.basic.ui.screens.worker.EarningsScreen
+import com.kotkit.basic.ui.screens.worker.PayoutScreen
 import com.kotkit.basic.ui.screens.worker.WorkerDashboardScreen
 
 sealed class Screen(val route: String) {
@@ -34,6 +35,7 @@ sealed class Screen(val route: String) {
     object AvailableTasks : Screen("available_tasks")
     object CompletedTasks : Screen("completed_tasks")
     object Earnings : Screen("earnings")
+    object Payout : Screen("payout")
 }
 
 @Composable
@@ -183,7 +185,13 @@ fun NavGraph(navController: NavHostController) {
         composable(Screen.Earnings.route) {
             EarningsScreen(
                 onNavigateBack = { navController.popBackStack() },
-                onRequestPayout = { /* TODO: Navigate to payout screen or show dialog */ }
+                onRequestPayout = { navController.navigate(Screen.Payout.route) }
+            )
+        }
+
+        composable(Screen.Payout.route) {
+            PayoutScreen(
+                onNavigateBack = { navController.popBackStack() }
             )
         }
     }

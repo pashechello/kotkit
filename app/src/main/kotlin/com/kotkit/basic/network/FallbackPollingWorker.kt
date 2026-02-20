@@ -1,7 +1,7 @@
 package com.kotkit.basic.network
 
 import android.content.Context
-import android.util.Log
+import timber.log.Timber
 import androidx.hilt.work.HiltWorker
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
@@ -35,11 +35,32 @@ class FallbackPollingWorker @AssistedInject constructor(
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
-        Log.d(TAG, "Fallback polling worker running")
+        Timber.tag(TAG).d("Fallback polling worker running")
 
         if (!workerRepository.isWorkerActive()) {
-            Log.d(TAG, "Worker mode not active, skipping")
+            Timber.tag(TAG).d("Worker mode not active, skipping")
             return Result.success()
+        }
+
+        // Resurrect service if killed by OEM (WorkManager survives process death)
+        val isAlive = NetworkWorkerService.isServiceAlive
+        val shouldRun = NetworkWorkerService.shouldBeRunning(context)
+        if (!isAlive && shouldRun) {
+            val delay = RestartThrottler.recordStartAndGetDelay(context)
+            if (delay > 0) {
+                Timber.tag(TAG).w("SERVICE RESURRECTION THROTTLED via WorkManager: " +
+                    "too many rapid restarts, skipping this cycle (delay=${delay / 1000}s)")
+            } else {
+                Timber.tag(TAG).w("SERVICE RESURRECTION via WorkManager: isServiceAlive=false, shouldBeRunning=true, " +
+                    "pid=${android.os.Process.myPid()}")
+                try {
+                    NetworkWorkerService.start(context)
+                    Timber.tag(TAG).i("SERVICE RESURRECTION: startForegroundService() called from fallback poll")
+                } catch (e: Exception) {
+                    Timber.tag(TAG).e(e, "SERVICE RESURRECTION FAILED from fallback poll. " +
+                        "OEM=${android.os.Build.MANUFACTURER}, SDK=${android.os.Build.VERSION.SDK_INT}")
+                }
+            }
         }
 
         // Trigger task check via coordinator
@@ -75,12 +96,12 @@ class FallbackPollingWorker @AssistedInject constructor(
                 request
             )
 
-            Log.i(TAG, "Fallback polling scheduled (every $INTERVAL_MINUTES min)")
+            Timber.tag(TAG).i("Fallback polling scheduled (every $INTERVAL_MINUTES min)")
         }
 
         fun cancel(workManager: WorkManager) {
             workManager.cancelUniqueWork(UNIQUE_WORK_NAME)
-            Log.i(TAG, "Fallback polling cancelled")
+            Timber.tag(TAG).i("Fallback polling cancelled")
         }
     }
 }

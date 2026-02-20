@@ -10,6 +10,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.delay
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.random.Random
 
 @Singleton
 class ActionExecutor @Inject constructor(
@@ -47,11 +48,12 @@ class ActionExecutor @Inject constructor(
         val result = when (action.action) {
             ActionType.TAP -> executeTap(service, action)
             ActionType.SWIPE -> executeSwipe(service, action)
-            ActionType.TYPE_TEXT, ActionType.TYPE -> executeType(service, action)
+            ActionType.TYPE_TEXT, ActionType.TYPE -> executeType(service, action, isCancelled)
             ActionType.WAIT -> executeWait(action, isCancelled)
             ActionType.BACK -> executeBack(service, action)
             // NOTE: LAUNCH_TIKTOK removed - Share Intent is the only supported flow
             ActionType.DISMISS_POPUP -> executeDismissPopup(service, action)
+            ActionType.HANDLE_POPUP -> executeDismissPopup(service, action) // Safety net: backend converts handle_popup to tap(x,y)
             ActionType.NAVIGATE_TO_FEED -> executeNavigateToFeed(service)
             ActionType.FINISH, ActionType.DONE -> ExecutionResult.Done(action.message)
             ActionType.ERROR -> ExecutionResult.Error(action.message, action.recoverable ?: false)
@@ -64,8 +66,10 @@ class ActionExecutor @Inject constructor(
         }
 
         // Add human-like post-action delay (unless it's a terminal state)
+        // NOTE: Only apply humanizer's short delay here (100-300ms).
+        // The main inter-step wait (waitAfter + jitter) is handled by PostingAgent.
         if (result !is ExecutionResult.Done && result !is ExecutionResult.Error && result !is ExecutionResult.Cancelled) {
-            val postDelay = action.waitAfter?.toLong() ?: humanizer.generatePostActionDelay()
+            val postDelay = humanizer.generatePostActionDelay()
             if (!cancellableDelay(postDelay, isCancelled)) {
                 return ExecutionResult.Cancelled
             }
@@ -169,14 +173,21 @@ class ActionExecutor @Inject constructor(
 
     private suspend fun executeType(
         service: TikTokAccessibilityService,
-        action: AnalyzeResponse
+        action: AnalyzeResponse,
+        isCancelled: (() -> Boolean)? = null
     ): ExecutionResult {
         val text = action.text ?: return ExecutionResult.Failed("Missing text to type")
 
         Timber.tag(TAG).d("Type: '$text'")
 
-        val success = service.type(text)
+        // Thinking pause before typing (human reads screen, thinks about caption)
+        val thinkingMs = Random.nextLong(800, 3000)
+        Timber.tag(TAG).d("Thinking pause before typing: ${thinkingMs}ms")
+        if (!cancellableDelay(thinkingMs, isCancelled)) {
+            return ExecutionResult.Cancelled
+        }
 
+        val success = service.type(text)
         return if (success) ExecutionResult.Success else ExecutionResult.Failed("Type failed")
     }
 
@@ -221,7 +232,18 @@ class ActionExecutor @Inject constructor(
     ): ExecutionResult {
         Timber.tag(TAG).d("Dismiss popup: ${action.reason}")
 
-        // Try to find and click X/close button, or press back as fallback
+        // Primary: use grounded coordinates from backend SYMBIOSIS (Gemini+UI-TARS)
+        val x = action.x
+        val y = action.y
+        if (x != null && y != null) {
+            Timber.tag(TAG).d("Dismiss popup via SYMBIOSIS coords: ($x, $y)")
+            val success = service.tap(x, y)
+            return if (success) ExecutionResult.Success
+                   else ExecutionResult.Failed("Tap at ($x, $y) failed")
+        }
+
+        // Fallback: text-based search for dismiss buttons
+        Timber.tag(TAG).d("Dismiss popup via text search fallback")
         val clicked = service.clickByText("×", exactMatch = true) ||
                 service.clickByText("X", exactMatch = true) ||
                 service.clickByText("Close", exactMatch = false) ||
@@ -233,7 +255,7 @@ class ActionExecutor @Inject constructor(
             return ExecutionResult.Success
         }
 
-        // Fallback to back button
+        // Last resort: back button
         val backPressed = service.pressBack()
         return if (backPressed) ExecutionResult.Success else ExecutionResult.Failed("Failed to dismiss popup")
     }

@@ -24,7 +24,6 @@ sealed class AuthState {
  * Events related to authentication changes
  */
 sealed class AuthEvent {
-    object TokenExpired : AuthEvent()
     object LoggedOut : AuthEvent()
     object LoggedIn : AuthEvent()
 }
@@ -39,7 +38,6 @@ class AuthStateManager @Inject constructor(
 ) {
     companion object {
         private const val TAG = "AuthStateManager"
-        private const val TOKEN_EXPIRED_DEBOUNCE_MS = 5_000L
     }
 
     private val _authState = MutableStateFlow(getCurrentAuthState())
@@ -64,30 +62,15 @@ class AuthStateManager @Inject constructor(
         _authState.value = newState
     }
 
-    // Debounce: prevent multiple TokenExpired events from concurrent 401 responses
-    private val tokenExpiredLock = Any()
-    @Volatile
-    private var lastTokenExpiredTime = 0L
-
     /**
      * Called when token expires and refresh fails.
-     * Debounced to prevent multiple snackbars from concurrent 401 responses.
+     * Silently clears auth — UI reacts via authState, no notification needed.
      */
     fun onTokenExpired() {
-        val now = System.currentTimeMillis()
-        synchronized(tokenExpiredLock) {
-            if (now - lastTokenExpiredTime < TOKEN_EXPIRED_DEBOUNCE_MS) {
-                Timber.tag(TAG).d("Token expired debounced (${now - lastTokenExpiredTime}ms since last)")
-                return
-            }
-            lastTokenExpiredTime = now
-        }
-
         Timber.tag(TAG).w("Token expired, clearing auth")
         encryptedPreferences.clearAuth()
-        CorrelationIdInterceptor.resetSessionId() // New session on re-login
+        CorrelationIdInterceptor.resetSessionId()
         _authState.value = AuthState.NotAuthenticated
-        _authEvents.tryEmit(AuthEvent.TokenExpired)
     }
 
     /**

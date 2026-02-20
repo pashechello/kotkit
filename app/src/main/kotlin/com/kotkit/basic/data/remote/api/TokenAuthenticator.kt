@@ -1,8 +1,10 @@
 package com.kotkit.basic.data.remote.api
 
+import com.kotkit.basic.BuildConfig
 import com.kotkit.basic.auth.AuthStateManager
 import com.kotkit.basic.data.local.preferences.EncryptedPreferences
 import com.kotkit.basic.data.remote.api.models.RefreshTokenRequest
+import com.kotkit.basic.security.SSLPinning
 import com.google.gson.Gson
 import okhttp3.Authenticator
 import okhttp3.MediaType.Companion.toMediaType
@@ -127,15 +129,21 @@ class TokenAuthenticator @Inject constructor(
      * We use a separate OkHttpClient to avoid circular dependency.
      */
     private fun refreshTokenSync(refreshToken: String): String? {
-        val client = OkHttpClient.Builder()
+        val clientBuilder = OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
-            .build()
+
+        // Apply SSL pinning in release builds
+        if (!BuildConfig.DEBUG) {
+            clientBuilder.certificatePinner(SSLPinning.getCertificatePinner())
+        }
+
+        val client = clientBuilder.build()
 
         val requestBody = gson.toJson(RefreshTokenRequest(refreshToken))
             .toRequestBody("application/json".toMediaType())
 
-        val baseUrl = encryptedPreferences.serverUrl ?: "https://kotkit-app.fly.dev/"
+        val baseUrl = BuildConfig.API_BASE_URL
         val request = Request.Builder()
             .url("${baseUrl}api/v1/auth/refresh")
             .post(requestBody)

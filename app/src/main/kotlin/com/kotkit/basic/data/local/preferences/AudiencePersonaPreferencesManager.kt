@@ -2,7 +2,7 @@ package com.kotkit.basic.data.local.preferences
 
 import android.content.Context
 import android.content.SharedPreferences
-import android.util.Log
+import timber.log.Timber
 import com.kotkit.basic.data.remote.api.ApiService
 import com.kotkit.basic.data.remote.api.models.UpdateProfileRequest
 import com.kotkit.basic.data.repository.AuthRepository
@@ -63,13 +63,13 @@ class AudiencePersonaPreferencesManager @Inject constructor(
     suspend fun syncFromServer() {
         // Skip if not logged in
         if (!authRepository.isLoggedIn()) {
-            Log.d(TAG, "syncFromServer: skipped - user not logged in")
+            Timber.tag(TAG).d("syncFromServer: skipped - user not logged in")
             return
         }
 
         // Skip if user has pending changes to avoid overwriting
         if (isUserChangePending.get()) {
-            Log.d(TAG, "syncFromServer: skipped - user change pending")
+            Timber.tag(TAG).d("syncFromServer: skipped - user change pending")
             return
         }
 
@@ -80,10 +80,10 @@ class AudiencePersonaPreferencesManager @Inject constructor(
             // Double-check before saving (in case user changed while request was in flight)
             if (!isUserChangePending.get()) {
                 saveLocal(serverPersona)
-                Log.d(TAG, "syncFromServer: synced persona = $serverPersona")
+                Timber.tag(TAG).d("syncFromServer: synced persona = $serverPersona")
             }
         } catch (e: Exception) {
-            Log.w(TAG, "syncFromServer: failed - using local cache", e)
+            Timber.tag(TAG).w(e, "syncFromServer: failed - using local cache")
         }
     }
 
@@ -99,7 +99,7 @@ class AudiencePersonaPreferencesManager @Inject constructor(
 
         // Only sync to server if logged in
         if (!authRepository.isLoggedIn()) {
-            Log.d(TAG, "setPersona: saved locally only - user not logged in")
+            Timber.tag(TAG).d("setPersona: saved locally only - user not logged in")
             isUserChangePending.set(false)
             return
         }
@@ -107,9 +107,9 @@ class AudiencePersonaPreferencesManager @Inject constructor(
         // Sync to server in background
         try {
             apiService.updateProfile(UpdateProfileRequest(audiencePersona = persona.name))
-            Log.d(TAG, "setPersona: synced to server = $persona")
+            Timber.tag(TAG).d("setPersona: synced to server = $persona")
         } catch (e: Exception) {
-            Log.w(TAG, "setPersona: failed to sync to server", e)
+            Timber.tag(TAG).w(e, "setPersona: failed to sync to server")
             // Local value is still saved, will sync on next app start
         } finally {
             isUserChangePending.set(false)
@@ -126,7 +126,7 @@ class AudiencePersonaPreferencesManager @Inject constructor(
         return try {
             AudiencePersona.valueOf(personaName)
         } catch (e: IllegalArgumentException) {
-            Log.w(TAG, "Unknown persona from server: $personaName, using default")
+            Timber.tag(TAG).w("Unknown persona from server: $personaName, using default")
             AudiencePersona.DEFAULT
         }
     }

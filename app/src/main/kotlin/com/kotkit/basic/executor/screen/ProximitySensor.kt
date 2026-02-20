@@ -5,7 +5,7 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
-import android.util.Log
+import timber.log.Timber
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
@@ -44,7 +44,7 @@ class ProximitySensor @Inject constructor(
     suspend fun quickCheck(): CheckResult {
         val sensor = proximitySensor
         if (sensor == null) {
-            Log.w(TAG, "Proximity sensor not available")
+            Timber.tag(TAG).w("Proximity sensor not available")
             return CheckResult.SensorUnavailable
         }
 
@@ -60,7 +60,7 @@ class ProximitySensor @Inject constructor(
                         val maxRange = sensor.maximumRange
                         val isBlocked = distance < maxRange
 
-                        Log.d(TAG, "Proximity: ${distance}cm (max: ${maxRange}cm) → ${if (isBlocked) "BLOCKED" else "CLEAR"}")
+                        Timber.tag(TAG).d("Proximity: ${distance}cm (max: ${maxRange}cm) → ${if (isBlocked) "BLOCKED" else "CLEAR"}")
 
                         if (continuation.isActive) {
                             continuation.resume(
@@ -85,7 +85,7 @@ class ProximitySensor @Inject constructor(
         }
 
         return result ?: run {
-            Log.w(TAG, "Proximity check timeout")
+            Timber.tag(TAG).w("Proximity check timeout")
             CheckResult.SensorUnavailable
         }
     }

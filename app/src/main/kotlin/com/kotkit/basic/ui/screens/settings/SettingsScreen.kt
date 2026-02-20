@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
+import androidx.compose.material.icons.outlined.Code
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.lifecycle.Lifecycle
@@ -24,6 +25,8 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -35,6 +38,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.core.os.LocaleListCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.kotkit.basic.BuildConfig
 import com.kotkit.basic.R
 import com.kotkit.basic.scheduler.AudiencePersona
 import com.kotkit.basic.ui.components.BounceOverscrollContainer
@@ -211,7 +215,7 @@ fun SettingsScreen(
                             )
                         }
                     } else {
-                        GlassChip(text = stringResource(R.string.fix))
+                        GlassChip(text = stringResource(R.string.settings_battery_action))
                     }
                 }
             )
@@ -292,6 +296,7 @@ fun SettingsScreen(
                 subtitle = when {
                     uiState.hasStoredPin -> stringResource(R.string.settings_pin_saved)
                     uiState.hasStoredPassword -> stringResource(R.string.settings_password_saved)
+                    uiState.hasNoPinMode -> stringResource(R.string.settings_no_pin_mode)
                     else -> stringResource(R.string.settings_not_configured)
                 },
                 icon = Icons.Default.Lock,
@@ -501,30 +506,52 @@ fun SettingsScreen(
                 icon = Icons.Outlined.VideoLibrary
             )
 
-            GlassSettingRow(
-                title = stringResource(R.string.settings_tiktok_username),
-                subtitle = uiState.tiktokUsername?.let { "@$it" }
-                    ?: stringResource(R.string.settings_tiktok_not_set),
-                icon = Icons.Default.AccountCircle,
-                onClick = { viewModel.showTiktokDialog() },
-                iconColor = if (uiState.tiktokUsername != null) Success else Warning,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                trailingContent = {
-                    Icon(
-                        Icons.Default.Edit,
-                        contentDescription = null,
-                        tint = TextTertiary,
-                        modifier = Modifier.size(20.dp)
+            if (uiState.isLoggedIn) {
+                GlassSettingRow(
+                    title = stringResource(R.string.settings_tiktok_username),
+                    subtitle = uiState.tiktokUsername?.let { "@$it" }
+                        ?: stringResource(R.string.settings_tiktok_not_set),
+                    icon = Icons.Default.AccountCircle,
+                    onClick = { viewModel.showTiktokDialog() },
+                    iconColor = if (uiState.tiktokUsername != null) Success else Warning,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    trailingContent = {
+                        Icon(
+                            Icons.Default.Edit,
+                            contentDescription = null,
+                            tint = TextTertiary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                )
+
+                if (uiState.showTiktokUsernameDialog) {
+                    TikTokUsernameDialog(
+                        initialUsername = uiState.tiktokUsername ?: "",
+                        isSaving = uiState.isSavingTiktokUsername,
+                        onSave = { username -> viewModel.updateTiktokUsername(username) },
+                        onDismiss = { viewModel.dismissTiktokDialog() }
                     )
                 }
-            )
-
-            if (uiState.showTiktokUsernameDialog) {
-                TikTokUsernameDialog(
-                    initialUsername = uiState.tiktokUsername ?: "",
-                    isSaving = uiState.isSavingTiktokUsername,
-                    onSave = { username -> viewModel.updateTiktokUsername(username) },
-                    onDismiss = { viewModel.dismissTiktokDialog() }
+            } else {
+                GlassSettingRow(
+                    title = stringResource(R.string.settings_tiktok_username),
+                    subtitle = stringResource(R.string.settings_tiktok_login_required),
+                    icon = Icons.Default.AccountCircle,
+                    onClick = {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://kotkit.pro/auth/app"))
+                        context.startActivity(intent)
+                    },
+                    iconColor = TextTertiary,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    trailingContent = {
+                        Icon(
+                            Icons.Default.OpenInNew,
+                            contentDescription = null,
+                            tint = BrandCyan,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 )
             }
 
@@ -1068,39 +1095,124 @@ private fun PeakHoursBar(
 
 @Composable
 private fun BrandFooter() {
+    val infiniteTransition = rememberInfiniteTransition(label = "footer")
+
+    // Shimmer offset for gradient text
+    val shimmerOffset by infiniteTransition.animateFloat(
+        initialValue = -200f,
+        targetValue = 600f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(3000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "shimmer"
+    )
+
+    // Pulsing glow
+    val glowAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.08f,
+        targetValue = 0.25f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2500, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "glow"
+    )
+
+    // Heart pulse
+    val heartScale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.3f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(600, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "heart"
+    )
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Brand gradient line
         Box(
-            modifier = Modifier
-                .width(60.dp)
-                .height(3.dp)
-                .clip(RoundedCornerShape(2.dp))
-                .background(
-                    brush = Brush.linearGradient(
-                        colors = listOf(BrandCyan, BrandPink)
+            contentAlignment = Alignment.Center
+        ) {
+            // Ambient glow behind content
+            Box(
+                modifier = Modifier
+                    .size(160.dp, 110.dp)
+                    .background(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                BrandCyan.copy(alpha = glowAlpha),
+                                BrandPink.copy(alpha = glowAlpha * 0.4f),
+                                Color.Transparent
+                            )
+                        )
+                    )
+            )
+
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Cat paw
+                Text(
+                    text = "\uD83D\uDC3E",
+                    fontSize = 28.sp
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Gradient shimmer "KotKit"
+                Text(
+                    text = "KotKit",
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontWeight = FontWeight.Bold,
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                BrandCyan,
+                                BrandPink,
+                                BrandCyan
+                            ),
+                            start = Offset(shimmerOffset, 0f),
+                            end = Offset(shimmerOffset + 200f, 0f)
+                        )
                     )
                 )
-        )
 
-        Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
-        Text(
-            text = "KotKit",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = TextTertiary
-        )
+                // Made with pulsing heart
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Made with ",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextMuted
+                    )
+                    Text(
+                        text = "\u2764\uFE0F",
+                        fontSize = 14.sp,
+                        modifier = Modifier.graphicsLayer {
+                            scaleX = heartScale
+                            scaleY = heartScale
+                        }
+                    )
+                }
 
-        Text(
-            text = "Made with ❤️",
-            style = MaterialTheme.typography.bodySmall,
-            color = TextMuted
-        )
+                Spacer(modifier = Modifier.height(6.dp))
+
+                // App version
+                Text(
+                    text = "v${BuildConfig.VERSION_NAME}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextDisabled
+                )
+            }
+        }
     }
 }
 
@@ -1114,6 +1226,8 @@ private fun GlassAutostartConfirmDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val message = stringResource(R.string.autostart_confirm_message_generic, manufacturerName)
+
     Dialog(onDismissRequest = onDismiss) {
         Box(
             modifier = Modifier
@@ -1164,7 +1278,7 @@ private fun GlassAutostartConfirmDialog(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Text(
-                    text = stringResource(R.string.autostart_confirm_message, manufacturerName),
+                    text = message,
                     style = MaterialTheme.typography.bodyMedium,
                     color = TextSecondary,
                     modifier = Modifier.padding(horizontal = 8.dp)
@@ -1313,3 +1427,4 @@ private fun GlassAutostartManualDialog(
         }
     }
 }
+

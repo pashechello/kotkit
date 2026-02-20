@@ -1,5 +1,6 @@
 package com.kotkit.basic.ui.screens.settings
 
+import com.kotkit.basic.ui.components.SnackbarController
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -24,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.kotkit.basic.R
@@ -41,15 +43,18 @@ fun UnlockSettingsScreen(
     val uiState by viewModel.uiState.collectAsState()
     val testUnlockCountdown by viewModel.testUnlockCountdown.collectAsState()
     val testUnlockResult by viewModel.testUnlockResult.collectAsState()
-    var selectedType by remember { mutableStateOf(if (uiState.hasStoredPassword) 1 else 0) }
+    var selectedType by remember { mutableStateOf(0) }
+    // Update selectedType when uiState loads from storage
+    LaunchedEffect(uiState.isLoading) {
+        if (!uiState.isLoading) {
+            selectedType = if (uiState.hasNoPinMode) 1 else 0
+        }
+    }
     var pin by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var showPassword by remember { mutableStateOf(false) }
-    var showSnackbar by remember { mutableStateOf<String?>(null) }
+    // Snackbar messages routed to global SnackbarController
 
     val savedMessage = stringResource(R.string.unlock_saved)
     val pinError = stringResource(R.string.unlock_pin_error)
-    val passwordError = stringResource(R.string.unlock_password_error)
     val clearedMessage = stringResource(R.string.unlock_cleared)
 
     Box(
@@ -118,7 +123,7 @@ fun UnlockSettingsScreen(
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         GlassTypeChip(
                             text = stringResource(R.string.unlock_pin),
@@ -128,52 +133,59 @@ fun UnlockSettingsScreen(
                             modifier = Modifier.weight(1f)
                         )
                         GlassTypeChip(
-                            text = stringResource(R.string.unlock_password),
-                            icon = Icons.Default.Password,
+                            text = stringResource(R.string.unlock_no_pin),
+                            icon = Icons.Default.LockOpen,
                             isSelected = selectedType == 1,
                             onClick = { selectedType = 1 },
                             modifier = Modifier.weight(1f)
                         )
                     }
 
-                    // Input field
-                    GlassCard {
-                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Text(
-                                text = if (selectedType == 0)
-                                    stringResource(R.string.unlock_enter_pin)
-                                else
-                                    stringResource(R.string.unlock_enter_password),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = TextTertiary
-                            )
+                    // Input field (hidden for "no pin" mode)
+                    if (selectedType == 1) {
+                        // No PIN info card
+                        GlassCard {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(Success.copy(alpha = 0.15f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        Icons.Default.LockOpen,
+                                        contentDescription = null,
+                                        tint = Success,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                Text(
+                                    text = stringResource(R.string.unlock_no_pin_info),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = TextSecondary,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+                    } else {
+                        GlassCard {
+                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Text(
+                                    text = stringResource(R.string.unlock_enter_pin),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = TextTertiary
+                                )
 
-                            if (selectedType == 0) {
                                 GlassTextField(
                                     value = pin,
                                     onValueChange = { if (it.length <= 8 && it.all { c -> c.isDigit() }) pin = it },
                                     placeholder = "****",
                                     keyboardType = KeyboardType.NumberPassword,
                                     isPassword = true
-                                )
-                            } else {
-                                GlassTextField(
-                                    value = password,
-                                    onValueChange = { password = it },
-                                    placeholder = "********",
-                                    keyboardType = KeyboardType.Password,
-                                    isPassword = !showPassword,
-                                    trailingIcon = {
-                                        Icon(
-                                            if (showPassword) Icons.Default.VisibilityOff
-                                            else Icons.Default.Visibility,
-                                            contentDescription = stringResource(R.string.unlock_toggle_visibility),
-                                            tint = TextTertiary,
-                                            modifier = Modifier
-                                                .size(22.dp)
-                                                .clickable { showPassword = !showPassword }
-                                        )
-                                    }
                                 )
                             }
                         }
@@ -208,16 +220,15 @@ fun UnlockSettingsScreen(
                     // Save button
                     GradientButton(
                         onClick = {
-                            val success = if (selectedType == 0) {
-                                viewModel.savePin(pin)
-                            } else {
-                                viewModel.savePassword(password)
+                            val success = when (selectedType) {
+                                0 -> viewModel.savePin(pin)
+                                else -> viewModel.saveNoPinMode()
                             }
                             if (success) {
-                                showSnackbar = savedMessage
+                                SnackbarController.showSuccess(savedMessage)
                                 onNavigateBack()
                             } else {
-                                showSnackbar = if (selectedType == 0) pinError else passwordError
+                                SnackbarController.showError(pinError)
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),
@@ -235,7 +246,7 @@ fun UnlockSettingsScreen(
                     }
 
                     // Clear button if credentials exist
-                    if (uiState.hasStoredPin || uiState.hasStoredPassword) {
+                    if (uiState.hasStoredPin || uiState.hasNoPinMode) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -245,8 +256,7 @@ fun UnlockSettingsScreen(
                                 .clickable {
                                     viewModel.clearUnlockCredentials()
                                     pin = ""
-                                    password = ""
-                                    showSnackbar = clearedMessage
+                                    SnackbarController.showSuccess(clearedMessage)
                                 }
                                 .padding(vertical = 14.dp),
                             contentAlignment = Alignment.Center
@@ -270,8 +280,8 @@ fun UnlockSettingsScreen(
                         }
                     }
 
-                    // Test Unlock section (only show when Accessibility enabled and credentials saved)
-                    if (uiState.isAccessibilityEnabled && (uiState.hasStoredPin || uiState.hasStoredPassword)) {
+                    // Test Unlock section
+                    run {
                         Spacer(modifier = Modifier.height(8.dp))
 
                         // Test unlock button or countdown
@@ -393,19 +403,7 @@ fun UnlockSettingsScreen(
             }
         }
 
-        // Snackbar
-        showSnackbar?.let { message ->
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(16.dp)
-            ) {
-                GlassSnackbar(
-                    message = message,
-                    onDismiss = { showSnackbar = null }
-                )
-            }
-        }
+        // Snackbar is now handled globally by SnackbarController in MainActivity
     }
 }
 
@@ -640,48 +638,5 @@ private fun GlassTextField(
             }
         )
         trailingIcon?.invoke()
-    }
-}
-
-@Composable
-private fun GlassSnackbar(
-    message: String,
-    onDismiss: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(SurfaceElevated2)
-            .border(1.dp, Success.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
-            .padding(16.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.weight(1f)
-        ) {
-            Icon(
-                Icons.Default.CheckCircle,
-                contentDescription = null,
-                tint = Success,
-                modifier = Modifier.size(22.dp)
-            )
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextPrimary
-            )
-        }
-        Icon(
-            Icons.Default.Close,
-            contentDescription = stringResource(R.string.dismiss),
-            tint = TextTertiary,
-            modifier = Modifier
-                .size(20.dp)
-                .clickable(onClick = onDismiss)
-        )
     }
 }

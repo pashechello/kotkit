@@ -3,10 +3,12 @@ package com.kotkit.basic.di
 import com.kotkit.basic.BuildConfig
 import com.kotkit.basic.data.local.preferences.EncryptedPreferences
 import com.kotkit.basic.data.remote.api.ApiService
+import com.kotkit.basic.data.remote.api.AppSignatureInterceptor
 import com.kotkit.basic.data.remote.api.AuthInterceptor
 import com.kotkit.basic.data.remote.api.CorrelationIdInterceptor
 import com.kotkit.basic.data.remote.api.RetryInterceptor
 import com.kotkit.basic.data.remote.api.TokenAuthenticator
+import com.kotkit.basic.security.IntegrityChecker
 import com.kotkit.basic.security.SSLPinning
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
@@ -46,6 +48,14 @@ object NetworkModule {
 
     @Provides
     @Singleton
+    fun provideAppSignatureInterceptor(
+        integrityChecker: IntegrityChecker
+    ): AppSignatureInterceptor {
+        return AppSignatureInterceptor(integrityChecker)
+    }
+
+    @Provides
+    @Singleton
     fun provideCorrelationIdInterceptor(): CorrelationIdInterceptor {
         return CorrelationIdInterceptor()
     }
@@ -76,6 +86,7 @@ object NetworkModule {
     @Singleton
     fun provideOkHttpClient(
         correlationIdInterceptor: CorrelationIdInterceptor,
+        appSignatureInterceptor: AppSignatureInterceptor,
         authInterceptor: AuthInterceptor,
         tokenAuthenticator: TokenAuthenticator,
         retryInterceptor: RetryInterceptor,
@@ -83,6 +94,7 @@ object NetworkModule {
     ): OkHttpClient {
         val builder = OkHttpClient.Builder()
             .addInterceptor(correlationIdInterceptor) // First: add correlation ID to all requests
+            .addInterceptor(appSignatureInterceptor)  // App signature for server-side verification
             .addInterceptor(authInterceptor)
             .addInterceptor(retryInterceptor)
             .addInterceptor(loggingInterceptor)

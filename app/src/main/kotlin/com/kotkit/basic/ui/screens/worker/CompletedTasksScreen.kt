@@ -26,6 +26,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.kotkit.basic.data.remote.api.models.CompletedTaskItem
+import com.kotkit.basic.ui.components.SnackbarController
 import com.kotkit.basic.ui.theme.*
 import java.time.Instant
 import java.time.ZoneId
@@ -54,12 +55,11 @@ fun CompletedTasksScreen(
     viewModel: CompletedTasksViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val snackbarHostState = remember { SnackbarHostState() }
     var selectedTab by remember { mutableStateOf(StatsTab.ALL) }
 
     LaunchedEffect(uiState.error) {
         uiState.error?.let { error ->
-            snackbarHostState.showSnackbar(error)
+            SnackbarController.showError(error)
             viewModel.clearError()
         }
     }
@@ -68,11 +68,11 @@ fun CompletedTasksScreen(
         if (uiState.submitSuccess) {
             val reward = uiState.submitRewardRub
             val message = if (reward != null && reward > 0) {
-                "Ссылка отправлена! Бонус: ${String.format("%.0f", reward)} ₽"
+                "Мяу! Ссылка отправлена 🐾 Бонус: ${String.format("%.0f", reward)} ₽ 💰"
             } else {
-                "Ссылка отправлена!"
+                "Мяу! Ссылка отправлена 😸"
             }
-            snackbarHostState.showSnackbar(message)
+            SnackbarController.showSuccess(message)
             viewModel.clearSubmitSuccess()
         }
     }
@@ -106,7 +106,6 @@ fun CompletedTasksScreen(
     }
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Ваша статистика") },

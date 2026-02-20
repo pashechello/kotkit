@@ -1,8 +1,8 @@
 # Keep Retrofit models
--keep class com.autoposter.data.remote.api.models.** { *; }
+-keep class com.kotkit.basic.data.remote.api.models.** { *; }
 
 # Keep Room entities
--keep class com.autoposter.data.local.db.entities.** { *; }
+-keep class com.kotkit.basic.data.local.db.entities.** { *; }
 
 # Keep Hilt generated classes
 -keep class dagger.hilt.** { *; }
@@ -10,9 +10,12 @@
 -keep class * implements dagger.hilt.internal.GeneratedComponent { *; }
 
 # Keep Accessibility Service
--keep class com.autoposter.executor.accessibility.TikTokAccessibilityService { *; }
--keep class com.autoposter.executor.accessibility.portal.UIElement { *; }
--keep class com.autoposter.executor.accessibility.portal.UITree { *; }
+-keep class com.kotkit.basic.executor.accessibility.TikTokAccessibilityService { *; }
+-keep class com.kotkit.basic.executor.accessibility.portal.UIElement { *; }
+-keep class com.kotkit.basic.executor.accessibility.portal.UITree { *; }
+
+# Keep security classes (integrity checking, SSL pinning)
+-keep class com.kotkit.basic.security.** { *; }
 
 # OkHttp
 -dontwarn okhttp3.**

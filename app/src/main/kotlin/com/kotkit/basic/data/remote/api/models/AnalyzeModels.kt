@@ -72,6 +72,8 @@ data class AnalyzeResponse(
     val reason: String? = null,
     val message: String? = null,
     val recoverable: Boolean? = null,
+    // CASCADE resolution method (text_only, llm_vision, ui_tars, etc.)
+    @SerializedName("resolution_method") val resolutionMethod: String? = null,
     // Flag indicating this is the final publish button tap
     @SerializedName("isPublishAction") val isPublishAction: Boolean = false
 )
@@ -85,6 +87,7 @@ object ActionType {
     const val BACK = "back"
     // NOTE: LAUNCH_TIKTOK removed - Share Intent is the only supported flow
     const val DISMISS_POPUP = "dismiss_popup"
+    const val HANDLE_POPUP = "handle_popup"
     const val NAVIGATE_TO_FEED = "navigate_to_feed"
     const val FINISH = "finish"
 

@@ -22,6 +22,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.kotkit.basic.data.remote.api.models.TaskResponse
+import com.kotkit.basic.ui.components.SnackbarController
 import com.kotkit.basic.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -31,12 +32,10 @@ fun AvailableTasksScreen(
     viewModel: AvailableTasksViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val snackbarHostState = remember { SnackbarHostState() }
-
     // Show error
     LaunchedEffect(uiState.error) {
         uiState.error?.let { error ->
-            snackbarHostState.showSnackbar(error)
+            SnackbarController.showError(error)
             viewModel.clearError()
         }
     }
@@ -44,13 +43,12 @@ fun AvailableTasksScreen(
     // Show success
     LaunchedEffect(uiState.claimSuccess) {
         if (uiState.claimSuccess) {
-            snackbarHostState.showSnackbar("Задача успешно взята!")
+            SnackbarController.showSuccess("Мяу! Задача взята! 😸🐾")
             viewModel.clearClaimSuccess()
         }
     }
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Доступные задачи") },

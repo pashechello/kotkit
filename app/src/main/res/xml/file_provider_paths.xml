@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Internal app files directory for videos -->
-    <!-- Maps to: /data/data/com.autoposter/files/videos/ -->
+    <!-- Maps to: /data/data/com.kotkit.basic/files/videos/ -->
     <files-path
         name="videos"
         path="videos/" />

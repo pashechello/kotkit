@@ -4,7 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.util.Base64
-import android.util.Log
+import timber.log.Timber
 import androidx.hilt.work.HiltWorker
 import androidx.work.*
 import com.kotkit.basic.data.remote.api.ApiService
@@ -67,7 +67,7 @@ class VerificationWorker @AssistedInject constructor(
                 workRequest
             )
 
-            Log.i(TAG, "Verification worker scheduled (hourly)")
+            Timber.tag(TAG).i("Verification worker scheduled (hourly)")
         }
 
         /**
@@ -75,12 +75,12 @@ class VerificationWorker @AssistedInject constructor(
          */
         fun cancel(context: Context) {
             WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME)
-            Log.i(TAG, "Verification worker cancelled")
+            Timber.tag(TAG).i("Verification worker cancelled")
         }
     }
 
     override suspend fun doWork(): Result {
-        Log.i(TAG, "Starting verification check...")
+        Timber.tag(TAG).i("Starting verification check...")
 
         return try {
             // 1. Fetch pending verifications from backend
@@ -88,11 +88,11 @@ class VerificationWorker @AssistedInject constructor(
             val verifications = pendingResponse.verifications
 
             if (verifications.isEmpty()) {
-                Log.d(TAG, "No pending verifications")
+                Timber.tag(TAG).d("No pending verifications")
                 return Result.success()
             }
 
-            Log.i(TAG, "Found ${verifications.size} pending verifications")
+            Timber.tag(TAG).i("Found ${verifications.size} pending verifications")
 
             // 2. Process each verification
             var successCount = 0
@@ -102,7 +102,7 @@ class VerificationWorker @AssistedInject constructor(
                 try {
                     // Claim the verification
                     val claimResponse = apiService.claimVerification(verification.id)
-                    Log.d(TAG, "Claimed verification ${verification.id}")
+                    Timber.tag(TAG).d("Claimed verification ${verification.id}")
 
                     // Execute verification
                     val result = verifyVideo(verification.tiktokVideoUrl)
@@ -117,11 +117,11 @@ class VerificationWorker @AssistedInject constructor(
                     )
                     apiService.completeVerification(verification.id, request)
 
-                    Log.i(TAG, "Verification ${verification.id} completed: ${result.resultType}")
+                    Timber.tag(TAG).i("Verification ${verification.id} completed: ${result.resultType}")
                     successCount++
 
                 } catch (e: Exception) {
-                    Log.e(TAG, "Failed to process verification ${verification.id}", e)
+                    Timber.tag(TAG).e(e, "Failed to process verification ${verification.id}")
                     failCount++
                 }
 
@@ -129,11 +129,11 @@ class VerificationWorker @AssistedInject constructor(
                 delay(BETWEEN_VERIFICATIONS_DELAY_MS)
             }
 
-            Log.i(TAG, "Verification check complete: success=$successCount, failed=$failCount")
+            Timber.tag(TAG).i("Verification check complete: success=$successCount, failed=$failCount")
             Result.success()
 
         } catch (e: Exception) {
-            Log.e(TAG, "Verification worker failed", e)
+            Timber.tag(TAG).e(e, "Verification worker failed")
             Result.retry()
         }
     }
@@ -142,7 +142,7 @@ class VerificationWorker @AssistedInject constructor(
      * Verify a TikTok video exists and has engagement.
      */
     private suspend fun verifyVideo(videoUrl: String): VerificationCheckResult {
-        Log.d(TAG, "Verifying video: $videoUrl")
+        Timber.tag(TAG).d("Verifying video: $videoUrl")
 
         try {
             // Step 1: Open URL via Intent (will open in TikTok app)
@@ -198,7 +198,7 @@ class VerificationWorker @AssistedInject constructor(
             return result
 
         } catch (e: Exception) {
-            Log.e(TAG, "Video verification failed", e)
+            Timber.tag(TAG).e(e, "Video verification failed")
             return VerificationCheckResult(
                 resultType = "error",
                 errorMessage = e.message ?: "Unknown error"
@@ -235,7 +235,7 @@ class VerificationWorker @AssistedInject constructor(
 
             for (errorText in errorTexts) {
                 if (text.contains(errorText) || contentDesc.contains(errorText)) {
-                    Log.i(TAG, "Found error text: $errorText")
+                    Timber.tag(TAG).i("Found error text: $errorText")
                     return VerificationCheckResult(
                         resultType = "video_deleted",
                         screenshotB64 = screenshotB64,

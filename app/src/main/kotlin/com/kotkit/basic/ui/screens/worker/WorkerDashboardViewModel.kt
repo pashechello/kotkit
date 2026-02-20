@@ -1,7 +1,8 @@
 package com.kotkit.basic.ui.screens.worker
 
 import android.app.Application
-import android.util.Log
+import android.content.Intent
+import android.provider.Settings
 import androidx.lifecycle.ViewModel
 import timber.log.Timber
 import androidx.lifecycle.viewModelScope
@@ -12,8 +13,15 @@ import com.kotkit.basic.data.remote.api.models.TaskResponse
 import com.kotkit.basic.data.repository.NetworkTaskRepository
 import com.kotkit.basic.data.repository.SettingsRepository
 import com.kotkit.basic.data.repository.WorkerRepository
+import com.kotkit.basic.executor.screenshot.MediaProjectionConsentActivity
+import com.kotkit.basic.executor.screenshot.MediaProjectionScreenshot
 import com.kotkit.basic.network.NetworkWorkerService
+import com.kotkit.basic.permission.AutostartHelper
+import com.kotkit.basic.permission.BatteryOptimizationHelper
+import com.kotkit.basic.permission.DeviceProtectionChecker
+import android.os.Build
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -21,6 +29,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import retrofit2.HttpException
 import java.util.TimeZone
 import javax.inject.Inject
@@ -30,7 +39,10 @@ class WorkerDashboardViewModel @Inject constructor(
     private val application: Application,
     private val workerRepository: WorkerRepository,
     private val networkTaskRepository: NetworkTaskRepository,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val deviceProtectionChecker: DeviceProtectionChecker,
+    private val batteryOptimizationHelper: BatteryOptimizationHelper,
+    private val autostartHelper: AutostartHelper
 ) : ViewModel() {
 
     companion object {
@@ -49,7 +61,7 @@ class WorkerDashboardViewModel @Inject constructor(
      */
     private suspend fun autoRegisterIfNeeded(exception: Throwable?): Boolean {
         if (exception is HttpException && exception.code() == 404) {
-            Log.i(TAG, "Worker not registered, auto-registering...")
+            Timber.tag(TAG).i("Worker not registered, auto-registering...")
             val result = workerRepository.registerWorker(
                 tiktokUsername = null,
                 categoryIds = null,
@@ -90,6 +102,9 @@ class WorkerDashboardViewModel @Inject constructor(
 
         // Fetch fresh data from API
         refreshData()
+
+        // Check device protections
+        refreshProtectionStatus()
     }
 
     fun refreshData() {
@@ -113,13 +128,42 @@ class WorkerDashboardViewModel @Inject constructor(
         }
     }
 
+    /** Refresh device protection status (called on init + ON_RESUME). */
+    fun refreshProtectionStatus() {
+        viewModelScope.launch {
+            val status = withContext(Dispatchers.Default) {
+                deviceProtectionChecker.check()
+            }
+            _uiState.update { it.copy(protectionStatus = status) }
+        }
+    }
+
     fun requestToggleWorkerMode() {
         val targetState = !_uiState.value.isWorkerModeActive
-        if (targetState && _uiState.value.profile?.tiktokUsername.isNullOrBlank()) {
-            // Need TikTok username before enabling Worker Mode
-            _uiState.update { it.copy(showTiktokUsernameDialog = true) }
+
+        if (targetState) {
+            // Turning ON — check TikTok username first
+            if (_uiState.value.profile?.tiktokUsername.isNullOrBlank()) {
+                _uiState.update { it.copy(showTiktokUsernameDialog = true) }
+                return
+            }
+
+            // Check device protections (off main thread — Settings.Secure is Binder IPC)
+            viewModelScope.launch {
+                val status = withContext(Dispatchers.Default) {
+                    deviceProtectionChecker.check()
+                }
+                _uiState.update { it.copy(protectionStatus = status) }
+
+                if (!status.allCriticalOk) {
+                    _uiState.update { it.copy(showSetupDialog = true) }
+                } else {
+                    performToggle()
+                }
+            }
             return
         }
+
         performToggle()
     }
 
@@ -144,8 +188,8 @@ class WorkerDashboardViewModel @Inject constructor(
                     profile = result.getOrNull() ?: it.profile
                 ) }
                 if (!isEditMode) {
-                    // First-time setup — proceed with toggle ON
-                    performToggle()
+                    // First-time setup — now check protections before toggle
+                    requestToggleWorkerMode()
                 }
             } else {
                 val exception = result.exceptionOrNull()
@@ -156,6 +200,84 @@ class WorkerDashboardViewModel @Inject constructor(
             }
         }
     }
+
+    // --- Setup dialog methods ---
+
+    fun dismissSetupDialog() {
+        _uiState.update { it.copy(showSetupDialog = false) }
+    }
+
+    /** Open setup dialog directly (e.g. from warning card). */
+    fun showSetupDialog() {
+        viewModelScope.launch {
+            val status = withContext(Dispatchers.Default) {
+                deviceProtectionChecker.check()
+            }
+            _uiState.update { it.copy(protectionStatus = status, showSetupDialog = true) }
+        }
+    }
+
+    /** Re-check protections and proceed if all good. */
+    fun retryToggleAfterSetup() {
+        viewModelScope.launch {
+            val status = withContext(Dispatchers.Default) {
+                deviceProtectionChecker.check()
+            }
+            _uiState.update { it.copy(protectionStatus = status) }
+            if (status.allCriticalOk) {
+                _uiState.update { it.copy(showSetupDialog = false) }
+                performToggle()
+            }
+        }
+    }
+
+    fun openAccessibilitySettings() {
+        val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        application.startActivity(intent)
+    }
+
+    fun openNotificationSettings() {
+        val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+            putExtra(Settings.EXTRA_APP_PACKAGE, application.packageName)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        application.startActivity(intent)
+    }
+
+    fun openBatteryOptimizationSettings() {
+        batteryOptimizationHelper.openBatteryOptimizationSettings()
+    }
+
+    fun openAutostartSettings() {
+        val opened = autostartHelper.openAutostartSettings()
+        if (opened) {
+            _uiState.update { it.copy(showAutostartConfirmDialog = true) }
+        } else {
+            _uiState.update { it.copy(showAutostartManualDialog = true) }
+        }
+    }
+
+    fun confirmAutostartEnabled() {
+        autostartHelper.setAutostartConfirmed(true)
+        _uiState.update { it.copy(showAutostartConfirmDialog = false) }
+        refreshProtectionStatus()
+    }
+
+    fun dismissAutostartConfirmDialog() {
+        _uiState.update { it.copy(showAutostartConfirmDialog = false) }
+    }
+
+    fun dismissAutostartManualDialog() {
+        _uiState.update { it.copy(showAutostartManualDialog = false) }
+    }
+
+    fun getAutostartChecklist(): List<String> = autostartHelper.getConfirmationChecklist()
+    fun getAutostartInstructions(): String = autostartHelper.getInstructionsForManufacturer()
+    fun getManufacturerName(): String = autostartHelper.getManufacturerName()
+
+    // --- Existing toggle logic ---
 
     private fun performToggle() {
         // Cancel any pending refresh to prevent race condition
@@ -193,8 +315,9 @@ class WorkerDashboardViewModel @Inject constructor(
                 }
 
                 if (newIsActive) {
-                    NetworkWorkerService.start(application)
+                    startWorkerWithScreenshotConsent()
                 } else {
+                    MediaProjectionScreenshot.release()
                     NetworkWorkerService.stop(application)
                 }
             } else {
@@ -207,6 +330,47 @@ class WorkerDashboardViewModel @Inject constructor(
                     isToggling = false
                 ) }
             }
+        }
+    }
+
+    /**
+     * On API 29, request MediaProjection consent before starting the worker service.
+     * On API 30+, start directly (screenshots use AccessibilityService.takeScreenshot()).
+     * If consent is denied or initialization fails, rollback the toggle.
+     */
+    private fun startWorkerWithScreenshotConsent() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            Timber.tag(TAG).i("API ${Build.VERSION.SDK_INT}: requesting MediaProjection consent")
+            MediaProjectionConsentActivity.start(application) { granted ->
+                if (granted) {
+                    val initialized = MediaProjectionScreenshot.initialize(application)
+                    if (initialized) {
+                        Timber.tag(TAG).i("MediaProjection initialized, starting worker")
+                        NetworkWorkerService.start(application)
+                    } else {
+                        Timber.tag(TAG).e("MediaProjection initialization failed")
+                        rollbackWorkerToggle("Screenshot setup failed")
+                    }
+                } else {
+                    Timber.tag(TAG).w("MediaProjection consent denied")
+                    rollbackWorkerToggle("Screen recording permission required for Worker Mode")
+                }
+            }
+        } else {
+            NetworkWorkerService.start(application)
+        }
+    }
+
+    /** Rollback worker toggle to OFF and show error. */
+    private fun rollbackWorkerToggle(errorMessage: String) {
+        viewModelScope.launch {
+            // Deactivate on server
+            workerRepository.toggleWorkerMode(false)
+            _uiState.update { it.copy(
+                isWorkerModeActive = false,
+                isToggling = false,
+                error = errorMessage
+            ) }
         }
     }
 
@@ -269,6 +433,12 @@ data class WorkerDashboardUiState(
     val isSavingUsername: Boolean = false,
     val isUsernameEditMode: Boolean = false,
 
+    // Device protection
+    val protectionStatus: DeviceProtectionChecker.ProtectionStatus? = null,
+    val showSetupDialog: Boolean = false,
+    val showAutostartConfirmDialog: Boolean = false,
+    val showAutostartManualDialog: Boolean = false,
+
     // Error
     val error: String? = null
 ) {
@@ -279,4 +449,5 @@ data class WorkerDashboardUiState(
     val successRate: Float get() = profile?.successRate ?: 0f
     val completedTasks: Int get() = profile?.completedTasks ?: 0
     val rating: Float get() = profile?.rating ?: 0f
+    val hasProtectionIssues: Boolean get() = protectionStatus?.allCriticalOk == false
 }

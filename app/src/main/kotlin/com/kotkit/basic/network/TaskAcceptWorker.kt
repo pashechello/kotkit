@@ -1,7 +1,7 @@
 package com.kotkit.basic.network
 
 import android.content.Context
-import android.util.Log
+import timber.log.Timber
 import androidx.hilt.work.HiltWorker
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
@@ -38,13 +38,13 @@ class TaskAcceptWorker @AssistedInject constructor(
     override suspend fun doWork(): Result {
         val taskId = inputData.getString(KEY_TASK_ID)
         if (taskId == null) {
-            Log.e(TAG, "No task_id in input data")
+            Timber.tag(TAG).e("No task_id in input data")
             return Result.failure()
         }
 
         // Check if worker mode is active
         if (!workerRepository.isWorkerActive()) {
-            Log.w(TAG, "Worker mode not active, skipping accept for $taskId")
+            Timber.tag(TAG).w("Worker mode not active, skipping accept for $taskId")
             return Result.failure()
         }
 
@@ -53,36 +53,36 @@ class TaskAcceptWorker @AssistedInject constructor(
         if (expiresAt > 0) {
             val now = System.currentTimeMillis() / 1000
             if (now > expiresAt) {
-                Log.w(TAG, "Reservation expired for $taskId (expired=$expiresAt, now=$now)")
+                Timber.tag(TAG).w("Reservation expired for $taskId (expired=$expiresAt, now=$now)")
                 return Result.failure()
             }
         }
 
-        Log.i(TAG, "Accepting reserved task: $taskId (attempt $runAttemptCount)")
+        Timber.tag(TAG).i("Accepting reserved task: $taskId (attempt $runAttemptCount)")
 
         val result = networkTaskRepository.acceptTask(taskId)
         if (result.isSuccess) {
             val entity = result.getOrThrow()
-            Log.i(TAG, "Accepted task $taskId, scheduling execution (scheduledFor=${entity.scheduledFor})")
+            Timber.tag(TAG).i("Accepted task $taskId, scheduling execution (scheduledFor=${entity.scheduledFor})")
             scheduleExecution(taskId, entity.scheduledFor)
             return Result.success()
         }
 
         val error = result.exceptionOrNull()
-        Log.w(TAG, "Failed to accept $taskId: ${error?.message}")
+        Timber.tag(TAG).w("Failed to accept $taskId: ${error?.message}")
 
         // Don't retry on 4xx client errors
         if (error is retrofit2.HttpException && error.code() in 400..499) {
-            Log.w(TAG, "Client error ${error.code()}, not retrying")
+            Timber.tag(TAG).w("Client error ${error.code()}, not retrying")
             return Result.failure()
         }
 
         // Retry on network/5xx errors (WorkManager handles backoff)
         return if (runAttemptCount < MAX_RETRIES) {
-            Log.d(TAG, "Will retry accept for $taskId")
+            Timber.tag(TAG).d("Will retry accept for $taskId")
             Result.retry()
         } else {
-            Log.e(TAG, "Max retries reached for $taskId")
+            Timber.tag(TAG).e("Max retries reached for $taskId")
             Result.failure()
         }
     }
@@ -104,7 +104,7 @@ class TaskAcceptWorker @AssistedInject constructor(
         if (scheduledFor != null && scheduledFor > System.currentTimeMillis()) {
             val delayMs = scheduledFor - System.currentTimeMillis()
             requestBuilder.setInitialDelay(delayMs, TimeUnit.MILLISECONDS)
-            Log.i(TAG, "Task $taskId delayed by ${delayMs / 1000 / 60}min (scheduledFor=$scheduledFor)")
+            Timber.tag(TAG).i("Task $taskId delayed by ${delayMs / 1000 / 60}min (scheduledFor=$scheduledFor)")
         }
 
         workManager.enqueueUniqueWork(
@@ -112,7 +112,7 @@ class TaskAcceptWorker @AssistedInject constructor(
             ExistingWorkPolicy.KEEP,
             requestBuilder.build()
         )
-        Log.i(TAG, "Scheduled execution for task $taskId")
+        Timber.tag(TAG).i("Scheduled execution for task $taskId")
     }
 
     companion object {
@@ -152,7 +152,7 @@ class TaskAcceptWorker @AssistedInject constructor(
                 request
             )
 
-            Log.i(TAG, "Enqueued accept for task $taskId")
+            Timber.tag(TAG).i("Enqueued accept for task $taskId")
         }
     }
 }

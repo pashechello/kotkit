@@ -18,7 +18,6 @@ class EncryptedPreferences(context: Context) {
         private const val KEY_USER_EMAIL = "user_email"
         private const val KEY_ONBOARDING_COMPLETE = "onboarding_complete"
         private const val KEY_ACCESSIBILITY_ENABLED = "accessibility_enabled"
-        private const val KEY_SERVER_URL = "server_url"
         private const val KEY_APP_LANGUAGE = "app_language"
 
         // Sound settings keys
@@ -69,11 +68,6 @@ class EncryptedPreferences(context: Context) {
     var isAccessibilityEnabled: Boolean
         get() = prefs.getBoolean(KEY_ACCESSIBILITY_ENABLED, false)
         set(value) = prefs.edit().putBoolean(KEY_ACCESSIBILITY_ENABLED, value).apply()
-
-    // Server URL (for custom server setup)
-    var serverUrl: String?
-        get() = prefs.getString(KEY_SERVER_URL, null)
-        set(value) = prefs.edit().putString(KEY_SERVER_URL, value).apply()
 
     // App Language (default is Russian "ru")
     var appLanguage: String

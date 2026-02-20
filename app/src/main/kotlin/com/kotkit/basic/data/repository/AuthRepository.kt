@@ -5,15 +5,13 @@ import com.kotkit.basic.data.remote.api.ApiService
 import com.kotkit.basic.data.remote.api.models.LoginRequest
 import com.kotkit.basic.data.remote.api.models.RefreshTokenRequest
 import com.kotkit.basic.data.remote.api.models.RegisterRequest
-import com.kotkit.basic.security.DeviceFingerprint
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class AuthRepository @Inject constructor(
     private val apiService: ApiService,
-    private val encryptedPreferences: EncryptedPreferences,
-    private val deviceFingerprint: DeviceFingerprint
+    private val encryptedPreferences: EncryptedPreferences
 ) {
     fun isLoggedIn(): Boolean = encryptedPreferences.isLoggedIn()
 
@@ -22,8 +20,7 @@ class AuthRepository @Inject constructor(
             val response = apiService.login(
                 LoginRequest(
                     email = email,
-                    password = password,
-                    deviceId = deviceFingerprint.getDeviceId()
+                    password = password
                 )
             )
 
@@ -46,8 +43,7 @@ class AuthRepository @Inject constructor(
                 RegisterRequest(
                     email = email,
                     password = password,
-                    username = username,
-                    deviceId = deviceFingerprint.getDeviceId()
+                    name = username
                 )
             )
 

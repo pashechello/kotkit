@@ -1,7 +1,7 @@
 package com.kotkit.basic.network
 
 import android.content.Context
-import android.util.Log
+import timber.log.Timber
 import androidx.hilt.work.HiltWorker
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
@@ -16,7 +16,7 @@ import dagger.assisted.AssistedInject
 import java.util.concurrent.TimeUnit
 
 /**
- * Periodic worker that uploads device logs every 30 minutes.
+ * Periodic worker that uploads device logs every 15 minutes.
  * Only runs when worker mode is active and network is available.
  */
 @HiltWorker
@@ -28,10 +28,10 @@ class LogUploadWorker @AssistedInject constructor(
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
-        Log.d(TAG, "Log upload worker running")
+        Timber.tag(TAG).d("Log upload worker running")
 
         if (!workerRepository.isWorkerActive()) {
-            Log.d(TAG, "Worker mode not active, skipping log upload")
+            Timber.tag(TAG).d("Worker mode not active, skipping log upload")
             return Result.success()
         }
 
@@ -42,7 +42,7 @@ class LogUploadWorker @AssistedInject constructor(
     companion object {
         private const val TAG = "LogUploadWorker"
         private const val UNIQUE_WORK_NAME = "log_upload_periodic"
-        private const val INTERVAL_MINUTES = 30L
+        private const val INTERVAL_MINUTES = 15L
 
         fun schedule(workManager: WorkManager) {
             val constraints = Constraints.Builder()
@@ -52,7 +52,7 @@ class LogUploadWorker @AssistedInject constructor(
 
             val request = PeriodicWorkRequestBuilder<LogUploadWorker>(
                 INTERVAL_MINUTES, TimeUnit.MINUTES,
-                10, TimeUnit.MINUTES // Flex interval
+                5, TimeUnit.MINUTES // Flex interval
             )
                 .setConstraints(constraints)
                 .build()
@@ -63,12 +63,12 @@ class LogUploadWorker @AssistedInject constructor(
                 request
             )
 
-            Log.i(TAG, "Log upload scheduled (every $INTERVAL_MINUTES min)")
+            Timber.tag(TAG).i("Log upload scheduled (every $INTERVAL_MINUTES min)")
         }
 
         fun cancel(workManager: WorkManager) {
             workManager.cancelUniqueWork(UNIQUE_WORK_NAME)
-            Log.i(TAG, "Log upload cancelled")
+            Timber.tag(TAG).i("Log upload cancelled")
         }
     }
 }

@@ -9,7 +9,7 @@ import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
-import android.util.Log
+import timber.log.Timber
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.kotkit.basic.App
@@ -53,7 +53,7 @@ object SchedulerNotifications {
 
     private val warningMessages1Min = listOf(
         "МЯУ! ОДНА МИНУТА! Не трогай!!! 🙀",
-        "МУРРР! Сейчас начну! Лапы прочь от телефона! 😼",
+        "Муррр! Скоро начну постить, положи телефончик! 😸",
         "Мяу-мяу-мяу! Уже бегу постить! 🏃‍♂️🐱"
     )
 
@@ -129,7 +129,7 @@ object SchedulerNotifications {
      */
     fun showWarningNotification(context: Context, postId: Long, minutesBefore: Int) {
         if (!canPostNotifications(context)) {
-            Log.w(TAG, "POST_NOTIFICATIONS permission not granted, skipping notification")
+            Timber.tag(TAG).w("POST_NOTIFICATIONS permission not granted, skipping notification")
             return
         }
 
@@ -179,7 +179,7 @@ object SchedulerNotifications {
             .setOngoing(true)
             .addAction(R.drawable.ic_cancel, "Отменить 🐾", cancelPendingIntent)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
-            .setSound(getSoundUri(context, SoundType.MEOW_WARNING))
+            .setSilent(true)
             .build()
 
         notificationManager.notify(
@@ -193,7 +193,7 @@ object SchedulerNotifications {
      */
     fun showStartingNotification(context: Context, postId: Long) {
         if (!canPostNotifications(context)) {
-            Log.w(TAG, "POST_NOTIFICATIONS permission not granted, skipping notification")
+            Timber.tag(TAG).w("POST_NOTIFICATIONS permission not granted, skipping notification")
             return
         }
 
@@ -226,7 +226,7 @@ object SchedulerNotifications {
             .setProgress(0, 0, true)
             .addAction(R.drawable.ic_cancel, "Остановить 🐾", stopPendingIntent)
             .setStyle(NotificationCompat.BigTextStyle().bigText(message))
-            .setSound(getSoundUri(context, SoundType.MEOW_STARTING))
+            .setSilent(true)
             .build()
 
         notificationManager.notify(
@@ -244,7 +244,7 @@ object SchedulerNotifications {
         postId: Long
     ) {
         if (!canPostNotifications(context)) {
-            Log.w(TAG, "POST_NOTIFICATIONS permission not granted, skipping notification")
+            Timber.tag(TAG).w("POST_NOTIFICATIONS permission not granted, skipping notification")
             return
         }
 
@@ -288,7 +288,7 @@ object SchedulerNotifications {
      */
     fun showSuccessNotification(context: Context, postId: Long, message: String? = null) {
         if (!canPostNotifications(context)) {
-            Log.w(TAG, "POST_NOTIFICATIONS permission not granted, skipping notification")
+            Timber.tag(TAG).w("POST_NOTIFICATIONS permission not granted, skipping notification")
             return
         }
 
@@ -332,7 +332,7 @@ object SchedulerNotifications {
      */
     fun showFailedNotification(context: Context, postId: Long, reason: String) {
         if (!canPostNotifications(context)) {
-            Log.w(TAG, "POST_NOTIFICATIONS permission not granted, skipping notification")
+            Timber.tag(TAG).w("POST_NOTIFICATIONS permission not granted, skipping notification")
             return
         }
 

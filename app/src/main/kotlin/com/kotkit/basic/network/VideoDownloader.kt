@@ -1,7 +1,7 @@
 package com.kotkit.basic.network
 
 import android.content.Context
-import android.util.Log
+import timber.log.Timber
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -68,11 +68,11 @@ class VideoDownloader @Inject constructor(
         try {
             // Check existing file for resume
             val existingSize = if (destFile.exists()) destFile.length() else 0L
-            Log.i(TAG, "Downloading video for task $taskId: existingSize=$existingSize, expectedSize=$expectedSize")
+            Timber.tag(TAG).i("Downloading video for task $taskId: existingSize=$existingSize, expectedSize=$expectedSize")
 
             // Skip download if already complete
             if (existingSize == expectedSize && verifyChecksum(destFile, expectedHash)) {
-                Log.i(TAG, "Video already downloaded and verified: $taskId")
+                Timber.tag(TAG).i("Video already downloaded and verified: $taskId")
                 onProgress(1f)
                 return@withContext Result.success(destFile.absolutePath)
             }
@@ -81,7 +81,7 @@ class VideoDownloader @Inject constructor(
             val requestBuilder = Request.Builder().url(url)
             if (supportsResume && existingSize > 0 && existingSize < expectedSize) {
                 requestBuilder.header("Range", "bytes=$existingSize-")
-                Log.i(TAG, "Resuming download from byte $existingSize")
+                Timber.tag(TAG).i("Resuming download from byte $existingSize")
             }
 
             val request = requestBuilder.build()
@@ -133,12 +133,12 @@ class VideoDownloader @Inject constructor(
                 throw IOException("Checksum verification failed")
             }
 
-            Log.i(TAG, "Video downloaded and verified: $taskId (${destFile.length()} bytes)")
+            Timber.tag(TAG).i("Video downloaded and verified: $taskId (${destFile.length()} bytes)")
             onProgress(1f)
             Result.success(destFile.absolutePath)
 
         } catch (e: Exception) {
-            Log.e(TAG, "Download failed for task $taskId", e)
+            Timber.tag(TAG).e(e, "Download failed for task $taskId")
             // Don't delete partial file - can resume later
             Result.failure(e)
         }
@@ -163,7 +163,7 @@ class VideoDownloader @Inject constructor(
         return if (file.exists()) {
             val deleted = file.delete()
             if (deleted) {
-                Log.i(TAG, "Deleted video for task $taskId")
+                Timber.tag(TAG).i("Deleted video for task $taskId")
             }
             deleted
         } else {
@@ -188,7 +188,7 @@ class VideoDownloader @Inject constructor(
      */
     private fun verifyChecksum(file: File, expectedHash: String): Boolean {
         if (expectedHash.isEmpty()) {
-            Log.w(TAG, "No hash provided, skipping verification")
+            Timber.tag(TAG).w("No hash provided, skipping verification")
             return true
         }
 
@@ -204,11 +204,11 @@ class VideoDownloader @Inject constructor(
             val actualHash = digest.digest().joinToString("") { "%02x".format(it) }
             val matches = actualHash.equals(expectedHash, ignoreCase = true)
             if (!matches) {
-                Log.w(TAG, "Checksum mismatch: expected=$expectedHash, actual=$actualHash")
+                Timber.tag(TAG).w("Checksum mismatch: expected=$expectedHash, actual=$actualHash")
             }
             matches
         } catch (e: Exception) {
-            Log.e(TAG, "Checksum verification error", e)
+            Timber.tag(TAG).e(e, "Checksum verification error")
             false
         }
     }
@@ -224,7 +224,7 @@ class VideoDownloader @Inject constructor(
         videosDir.listFiles()?.forEach { file ->
             if (file.lastModified() < cutoff) {
                 if (file.delete()) {
-                    Log.i(TAG, "Cleaned up old video: ${file.name}")
+                    Timber.tag(TAG).i("Cleaned up old video: ${file.name}")
                 }
             }
         }

@@ -266,7 +266,7 @@ class NewPostViewModel @Inject constructor(
                 try {
                     File(path).delete()
                 } catch (e: Exception) {
-                    android.util.Log.w("NewPostVM", "Failed to delete video file: ${e.message}")
+                    Timber.tag("NewPostVM").w("Failed to delete video file: ${e.message}")
                 }
             }
             videos.removeAt(index)
@@ -1040,10 +1040,10 @@ class NewPostViewModel @Inject constructor(
                         val file = File(path)
                         if (file.exists()) {
                             file.delete()
-                            android.util.Log.i("NewPostVM", "Cleaned up uncommitted video: ${file.name}")
+                            Timber.tag("NewPostVM").i("Cleaned up uncommitted video: ${file.name}")
                         }
                     } catch (e: Exception) {
-                        android.util.Log.w("NewPostVM", "Failed to clean up video: ${e.message}")
+                        Timber.tag("NewPostVM").w("Failed to clean up video: ${e.message}")
                     }
                 }
             }
@@ -1097,13 +1097,13 @@ class NewPostViewModel @Inject constructor(
                 throw IllegalStateException("Video copy incomplete: expected $videoSize bytes, got $copiedSize bytes")
             }
 
-            android.util.Log.i("NewPostVM", "Copied video: ${actualDestFile.name}, size: ${copiedSize / 1_000_000}MB")
+            Timber.tag("NewPostVM").i("Copied video: ${actualDestFile.name}, size: ${copiedSize / 1_000_000}MB")
             actualDestFile.absolutePath
 
         } catch (e: Exception) {
             if (actualDestFile.exists()) {
                 actualDestFile.delete()
-                android.util.Log.w("NewPostVM", "Cleaned up partial file after copy failure")
+                Timber.tag("NewPostVM").w("Cleaned up partial file after copy failure")
             }
             throw e
         }

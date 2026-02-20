@@ -22,6 +22,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
 
     <!-- Wake Lock -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
@@ -47,6 +48,9 @@
 
     <!-- Screen Unlock -->
     <uses-permission android:name="android.permission.DISABLE_KEYGUARD" />
+
+    <!-- Vibration (for task notifications) -->
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <application
         android:name=".App"
@@ -84,6 +88,14 @@
                 <data android:scheme="kotkit" android:host="auth" />
             </intent-filter>
         </activity>
+
+        <!-- MediaProjection consent dialog (transparent, API 29 screenshot fallback) -->
+        <activity
+            android:name=".executor.screenshot.MediaProjectionConsentActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:excludeFromRecents="true"
+            android:noHistory="true" />
 
         <!-- Accessibility Service -->
         <service
@@ -140,11 +152,21 @@
         </receiver>
 
         <!-- Network Worker Service (Foreground Service for Network Mode) -->
+        <!-- mediaProjection needed for API 29 screenshot fallback via MediaProjection -->
         <service
             android:name=".network.NetworkWorkerService"
             android:exported="false"
-            android:foregroundServiceType="dataSync">
+            android:foregroundServiceType="dataSync|mediaProjection">
         </service>
+
+        <!-- Service Resurrector (AlarmManager-based watchdog for OEM process kills) -->
+        <receiver
+            android:name=".network.ResurrectorReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.kotkit.basic.ACTION_RESURRECT_SERVICE" />
+            </intent-filter>
+        </receiver>
 
         <!-- Disable default WorkManager initializer (using Hilt) -->
         <provider

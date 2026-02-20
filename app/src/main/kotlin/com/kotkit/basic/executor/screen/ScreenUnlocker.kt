@@ -1,6 +1,7 @@
 package com.kotkit.basic.executor.screen
 
 import android.content.Context
+import android.os.Build
 import android.util.DisplayMetrics
 import android.view.WindowManager
 import timber.log.Timber
@@ -64,8 +65,11 @@ class ScreenUnlocker @Inject constructor(
         while (!screenWaker.isScreenOn() && System.currentTimeMillis() - wakeStartTime < maxWakeWaitMs) {
             delay(wakeCheckInterval)
         }
-        // Extra settle time for MIUI keyguard to fully initialize after screen on
-        delay(500)
+        // Extra settle time for keyguard to fully initialize after screen on.
+        // EMUI 12 (com.huawei.android.launcher) initializes slower than MIUI — needs 800ms.
+        val settleMs = if (Build.MANUFACTURER?.lowercase()?.contains("huawei") == true) 800L else 500L
+        Timber.tag(TAG).w("Wake settle: ${settleMs}ms (manufacturer=${Build.MANUFACTURER})")
+        delay(settleMs)
         Timber.tag(TAG).w("⏱️ Wake + delay: ${System.currentTimeMillis() - wakeStartTime}ms (screenOn=${screenWaker.isScreenOn()})")
 
         // 2. Check if locked

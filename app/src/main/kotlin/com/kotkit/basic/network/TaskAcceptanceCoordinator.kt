@@ -1,6 +1,6 @@
 package com.kotkit.basic.network
 
-import android.util.Log
+import timber.log.Timber
 import java.util.Collections
 
 /**
@@ -26,7 +26,7 @@ object TaskAcceptanceCoordinator {
     fun tryStartAccepting(taskId: String): Boolean {
         val added = acceptingTasks.add(taskId)
         if (!added) {
-            Log.d(TAG, "Task $taskId is already being accepted by another caller")
+            Timber.tag(TAG).d("Task $taskId is already being accepted by another caller")
         }
         return added
     }
@@ -39,7 +39,7 @@ object TaskAcceptanceCoordinator {
      */
     fun finishAccepting(taskId: String) {
         acceptingTasks.remove(taskId)
-        Log.d(TAG, "Task $taskId acceptance finished")
+        Timber.tag(TAG).d("Task $taskId acceptance finished")
     }
 
     /**

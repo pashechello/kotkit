@@ -79,8 +79,9 @@
 
     <!-- TikTok Username -->
     <string name="settings_tiktok">TikTok</string>
-    <string name="settings_tiktok_username">Имя в TikTok</string>
+    <string name="settings_tiktok_username">Аккаунт TikTok</string>
     <string name="settings_tiktok_not_set">Не указано</string>
+    <string name="settings_tiktok_login_required">Войдите в аккаунт, чтобы указать имя в TikTok</string>
     <string name="tiktok_username_dialog_title">Введите имя в TikTok</string>
     <string name="tiktok_username_dialog_subtitle">Обязательно для Режима Работника. Мы проверим ваши публикации по этому профилю.</string>
     <string name="tiktok_username_hint">username</string>
@@ -126,17 +127,20 @@
     <string name="settings_unlock_credentials">Данные разблокировки</string>
     <string name="settings_pin_saved">PIN сохранён</string>
     <string name="settings_password_saved">Пароль сохранён</string>
+    <string name="settings_no_pin_mode">Без пароля (свайп)</string>
     <string name="settings_not_configured">Не настроено — требуется для запланированных постов</string>
     <string name="settings_worker_reliability">Для стабильной работы</string>
     <string name="settings_battery_optimization">Оптимизация батареи</string>
     <string name="settings_battery_disabled">Отключена — воркер работает надежно</string>
     <string name="settings_battery_enabled">Включена — может останавливать фоновые задачи</string>
+    <string name="settings_battery_action">Отключить</string>
     <string name="settings_oem_autostart">%1$s Разрешения</string>
     <string name="settings_oem_autostart_subtitle">Требуется для устройств %1$s для публикации из фона</string>
     <string name="settings_oem_autostart_enabled">Включены — фоновая публикация работает</string>
-    <string name="autostart_confirm_title">Разрешения включены?</string>
-    <string name="autostart_confirm_message">Вы включили ВСЕ разрешения для KotKit?\n\n• Автозапуск\n• Показ на экране блокировки\n• Всплывающие окна</string>
-    <string name="autostart_confirm_yes">Да, все включены</string>
+    <string name="autostart_confirm_title">Готово?</string>
+    <string name="autostart_confirm_message">Вы включили автозапуск для KotKit?</string>
+    <string name="autostart_confirm_message_generic">Вы включили фоновую работу для KotKit на %1$s?</string>
+    <string name="autostart_confirm_yes">Да, включил</string>
     <string name="autostart_confirm_no">Ещё нет</string>
     <string name="autostart_manual_title">Включите вручную</string>
     <string name="autostart_manual_message">Не удалось открыть настройки автоматически.\n\nВключите разрешения вручную:\n\n%1$s</string>
@@ -144,9 +148,32 @@
     <string name="autostart_manual_done">Готово</string>
     <string name="fix">Исправить</string>
 
+    <!-- Device Protection Setup Dialog -->
+    <string name="worker_setup_title">Настройте устройство</string>
+    <string name="worker_setup_subtitle">Для стабильной работы воркера включите все защиты</string>
+    <string name="worker_setup_retry">Проверить и запустить</string>
+    <string name="worker_setup_later">Позже</string>
+    <string name="worker_setup_accessibility">Служба специальных возможностей</string>
+    <string name="worker_setup_accessibility_ok">Включена</string>
+    <string name="worker_setup_accessibility_missing">Не включена</string>
+    <string name="worker_setup_notifications">Уведомления</string>
+    <string name="worker_setup_notifications_ok">Включены</string>
+    <string name="worker_setup_notifications_missing">Отключены — сервис будет убит</string>
+    <string name="worker_setup_battery">Оптимизация батареи</string>
+    <string name="worker_setup_battery_ok">Отключена</string>
+    <string name="worker_setup_battery_missing">Нужно отключить</string>
+    <string name="worker_setup_autostart">%1$s Автозапуск</string>
+    <string name="worker_setup_autostart_ok">Настроен</string>
+    <string name="worker_setup_autostart_missing">Требуется настроить</string>
+    <string name="worker_protection_warning">Не все защиты настроены</string>
+    <string name="worker_protection_warning_count">%1$d п. требуют внимания</string>
+    <string name="worker_accessibility_dead_title">Служба доступности упала</string>
+    <string name="worker_accessibility_dead_message">Воркер не может выполнять задачи. Нажмите для исправления.</string>
+    <string name="worker_accessibility_dead_instructions">Система остановила службу доступности.\n\n1. Нажмите на это уведомление\n2. Найдите «KotKit» в списке\n3. Выключите и снова включите\n\nЭто восстановит выполнение задач.</string>
+
     <!-- Caption Preferences Screen -->
     <string name="caption_prefs_title">Стиль подписей</string>
-    <string name="caption_prefs_saved">Настройки сохранены!</string>
+    <string name="caption_prefs_saved">Мяу! Настройки сохранены 😸</string>
     <string name="caption_prefs_customize_title">Настройте свой стиль подписей</string>
     <string name="caption_prefs_customize_desc">Установите предпочтительный тон, стиль и хештеги. AI будет генерировать подписи согласно вашим настройкам.</string>
     <string name="caption_prefs_use_custom">Использовать свой стиль</string>
@@ -183,11 +210,13 @@
     <string name="unlock_enter_pin">Введите PIN устройства</string>
     <string name="unlock_enter_password">Введите пароль устройства</string>
     <string name="unlock_toggle_visibility">Показать/скрыть пароль</string>
-    <string name="unlock_saved">Сохранено</string>
-    <string name="unlock_pin_error">PIN должен содержать минимум 4 цифры</string>
-    <string name="unlock_password_error">Пароль не может быть пустым</string>
+    <string name="unlock_saved">Мур-р! Сохранено 🐾</string>
+    <string name="unlock_pin_error">Кшш! PIN — минимум 4 цифры 🙀</string>
+    <string name="unlock_password_error">Мяу! Пароль не может быть пустым 🙀</string>
     <string name="unlock_clear">Удалить сохранённые данные</string>
-    <string name="unlock_cleared">Данные удалены</string>
+    <string name="unlock_cleared">Фыр! Данные удалены 🐾</string>
+    <string name="unlock_no_pin">Без пароля</string>
+    <string name="unlock_no_pin_info">На устройстве нет PIN-кода или пароля. Приложение разблокирует экран свайпом.</string>
 
     <!-- PostCard Component -->
     <string name="post_no_caption">(Без подписи)</string>
@@ -306,8 +335,8 @@
     <string name="auth_required_worker">Для режима заработка требуется авторизация</string>
     <string name="auth_login_via_website">Войти через сайт</string>
     <string name="auth_later">Позже</string>
-    <string name="auth_session_expired">Сессия истекла. Войдите заново.</string>
-    <string name="auth_login_success">Вход выполнен!</string>
+    <string name="auth_session_expired">Мяу… Сессия истекла, войдите заново 😿</string>
+    <string name="auth_login_success">С возвращением! 😻</string>
     <string name="error_auth_required_for_schedule">Войдите в аккаунт для планирования постов</string>
     <string name="error_select_video">Выберите видео</string>
     <string name="error_select_future_time">Выберите время в будущем</string>

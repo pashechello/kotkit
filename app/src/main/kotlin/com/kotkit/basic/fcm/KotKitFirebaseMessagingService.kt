@@ -3,15 +3,17 @@ package com.kotkit.basic.fcm
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
-import android.util.Log
+import timber.log.Timber
 import androidx.core.app.NotificationCompat
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
+import android.net.Uri
 import com.kotkit.basic.App
 import com.kotkit.basic.R
 import com.kotkit.basic.network.NetworkTaskCoordinator
 import com.kotkit.basic.network.NetworkWorkerService
 import com.kotkit.basic.network.TaskAcceptWorker
+import com.kotkit.basic.sound.SoundType
 import com.kotkit.basic.ui.MainActivity
 import dagger.hilt.android.AndroidEntryPoint
 import java.util.concurrent.atomic.AtomicInteger
@@ -36,12 +38,12 @@ class KotKitFirebaseMessagingService : FirebaseMessagingService() {
     private val notificationIdCounter = AtomicInteger(0)
 
     override fun onMessageReceived(message: RemoteMessage) {
-        Log.i(TAG, "FCM message received from: ${message.from}")
+        Timber.tag(TAG).i("FCM message received from: ${message.from}")
 
         // Extract data payload
         val data = message.data
         val notificationType = data["type"] ?: run {
-            Log.w(TAG, "No notification type in message")
+            Timber.tag(TAG).w("No notification type in message")
             return
         }
 
@@ -53,7 +55,7 @@ class KotKitFirebaseMessagingService : FirebaseMessagingService() {
             "payout_processed" -> handlePayoutProcessed(data)
             "url_submission_needed" -> handleUrlSubmissionNeeded(data)
             "announcement" -> handleAnnouncement(message)
-            else -> Log.w(TAG, "Unknown notification type: $notificationType")
+            else -> Timber.tag(TAG).w("Unknown notification type: $notificationType")
         }
     }
 
@@ -68,14 +70,14 @@ class KotKitFirebaseMessagingService : FirebaseMessagingService() {
      */
     private fun handleTaskReserved(data: Map<String, String>) {
         val taskId = data["task_id"] ?: run {
-            Log.w(TAG, "No task_id in task_reserved message")
+            Timber.tag(TAG).w("No task_id in task_reserved message")
             return
         }
         val campaignName = data["campaign_name"] ?: "New Task"
         val priceRub = data["price_rub"]?.toFloatOrNull() ?: 0f
         val expiresAt = data["expires_at"]?.toLongOrNull()
 
-        Log.i(TAG, "Task reserved: $taskId - $campaignName - ${priceRub} ₽ (expires: $expiresAt)")
+        Timber.tag(TAG).i("Task reserved: $taskId - $campaignName - ${priceRub} ₽ (expires: $expiresAt)")
 
         // Delegate accept to WorkManager - resilient to service lifecycle destruction.
         // WorkManager has its own coroutine scope that survives service onDestroy().
@@ -85,7 +87,7 @@ class KotKitFirebaseMessagingService : FirebaseMessagingService() {
         try {
             NetworkWorkerService.start(applicationContext)
         } catch (e: Exception) {
-            Log.w(TAG, "Could not start NetworkWorkerService", e)
+            Timber.tag(TAG).w(e, "Could not start NetworkWorkerService")
         }
 
         // Show notification
@@ -103,7 +105,7 @@ class KotKitFirebaseMessagingService : FirebaseMessagingService() {
         val campaignName = data["campaign_name"] ?: "New Task"
         val priceRub = data["price_rub"]?.toFloatOrNull() ?: 0f
 
-        Log.i(TAG, "Task available: $taskId - $campaignName - ${priceRub} ₽")
+        Timber.tag(TAG).i("Task available: $taskId - $campaignName - ${priceRub} ₽")
 
         // Trigger immediate task check
         taskCoordinator.triggerTaskCheck(immediate = true, reason = "fcm_notification")
@@ -134,7 +136,7 @@ class KotKitFirebaseMessagingService : FirebaseMessagingService() {
 
     private fun handleTaskCancelled(data: Map<String, String>) {
         val taskId = data["task_id"]
-        Log.i(TAG, "Task cancelled by server: $taskId")
+        Timber.tag(TAG).i("Task cancelled by server: $taskId")
 
         // Trigger task check — coordinator will see the task is gone and clean up
         taskCoordinator.triggerTaskCheck(immediate = true, reason = "task_cancelled")
@@ -145,9 +147,9 @@ class KotKitFirebaseMessagingService : FirebaseMessagingService() {
         val title = data["title"] ?: "Отправьте ссылку на видео"
         val body = data["body"] ?: "Пожалуйста, вставьте ссылку на ваш TikTok пост"
 
-        Log.i(TAG, "URL submission needed: $count task(s)")
+        Timber.tag(TAG).i("URL submission needed: $count task(s)")
 
-        showNotification(
+        showAlertNotification(
             title = title,
             body = body,
             navigateTo = "completed_tasks"
@@ -158,6 +160,35 @@ class KotKitFirebaseMessagingService : FirebaseMessagingService() {
         val title = message.notification?.title ?: "System Announcement"
         val body = message.notification?.body ?: ""
         showNotification(title, body)
+    }
+
+    private fun showAlertNotification(title: String, body: String, navigateTo: String? = null) {
+        val notificationId = notificationIdCounter.incrementAndGet()
+        val intent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            if (navigateTo != null) {
+                putExtra("navigate_to", navigateTo)
+            }
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            this, notificationId, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val soundUri = Uri.parse("android.resource://$packageName/${SoundType.MEOW_WARNING.rawResId}")
+
+        val notification = NotificationCompat.Builder(this, App.CHANNEL_ALERTS)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+            .setSound(soundUri)
+            .build()
+
+        val notificationManager = getSystemService(NotificationManager::class.java)
+        notificationManager.notify(notificationId, notification)
     }
 
     private fun showNotification(title: String, body: String, navigateTo: String? = null) {
@@ -186,7 +217,7 @@ class KotKitFirebaseMessagingService : FirebaseMessagingService() {
     }
 
     override fun onNewToken(token: String) {
-        Log.i(TAG, "New FCM token: ${token.take(20)}...")
+        Timber.tag(TAG).i("New FCM token: ${token.take(20)}...")
 
         // Register token with backend
         fcmTokenManager.updateToken(token)

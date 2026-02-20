@@ -1,5 +1,6 @@
 package com.kotkit.basic.ui.screens.captionprefs
 
+import com.kotkit.basic.ui.components.SnackbarController
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -35,12 +36,10 @@ fun CaptionPreferencesScreen(
     viewModel: CaptionPreferencesViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    var showSavedSnackbar by remember { mutableStateOf(false) }
-
     val savedMessage = stringResource(R.string.caption_prefs_saved)
     LaunchedEffect(uiState.showSavedMessage) {
         if (uiState.showSavedMessage) {
-            showSavedSnackbar = true
+            SnackbarController.showSuccess(savedMessage)
             viewModel.clearSavedMessage()
         }
     }
@@ -231,19 +230,7 @@ fun CaptionPreferencesScreen(
             }
         }
 
-        // Snackbar
-        if (showSavedSnackbar) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(16.dp)
-            ) {
-                GlassSnackbar(
-                    message = savedMessage,
-                    onDismiss = { showSavedSnackbar = false }
-                )
-            }
-        }
+        // Snackbar is now handled globally by SnackbarController in MainActivity
     }
 }
 
@@ -430,49 +417,6 @@ private fun ExampleItem(
             contentDescription = null,
             tint = BrandCyan,
             modifier = Modifier.size(20.dp)
-        )
-    }
-}
-
-@Composable
-private fun GlassSnackbar(
-    message: String,
-    onDismiss: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(SurfaceElevated2)
-            .border(1.dp, Success.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
-            .padding(16.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.weight(1f)
-        ) {
-            Icon(
-                Icons.Default.CheckCircle,
-                contentDescription = null,
-                tint = Success,
-                modifier = Modifier.size(22.dp)
-            )
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextPrimary
-            )
-        }
-        Icon(
-            Icons.Default.Close,
-            contentDescription = stringResource(R.string.dismiss),
-            tint = TextTertiary,
-            modifier = Modifier
-                .size(20.dp)
-                .clickable(onClick = onDismiss)
         )
     }
 }

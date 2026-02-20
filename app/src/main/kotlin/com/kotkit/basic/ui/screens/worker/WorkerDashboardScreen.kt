@@ -2,6 +2,7 @@ package com.kotkit.basic.ui.screens.worker
 
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
@@ -21,14 +22,21 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import android.media.MediaPlayer
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import com.kotkit.basic.R
+import com.kotkit.basic.permission.DeviceProtectionChecker
 import com.kotkit.basic.ui.components.TikTokUsernameDialog
+import com.kotkit.basic.ui.components.SnackbarController
 import com.kotkit.basic.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -43,12 +51,16 @@ fun WorkerDashboardScreen(
     viewModel: WorkerDashboardViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val snackbarHostState = remember { SnackbarHostState() }
+
+    // Refresh protection status when returning from system settings
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        viewModel.refreshProtectionStatus()
+    }
 
     // Show error
     LaunchedEffect(uiState.error) {
         uiState.error?.let { error ->
-            snackbarHostState.showSnackbar(error)
+            SnackbarController.showError(error)
             viewModel.clearError()
         }
     }
@@ -63,8 +75,39 @@ fun WorkerDashboardScreen(
         )
     }
 
+    // Device protection setup dialog
+    if (uiState.showSetupDialog && uiState.protectionStatus != null) {
+        DeviceProtectionSetupDialog(
+            protectionStatus = uiState.protectionStatus!!,
+            onOpenAccessibility = { viewModel.openAccessibilitySettings() },
+            onOpenNotifications = { viewModel.openNotificationSettings() },
+            onOpenBattery = { viewModel.openBatteryOptimizationSettings() },
+            onOpenAutostart = { viewModel.openAutostartSettings() },
+            onRetry = { viewModel.retryToggleAfterSetup() },
+            onDismiss = { viewModel.dismissSetupDialog() }
+        )
+    }
+
+    // Autostart confirm dialog (after returning from OEM settings)
+    if (uiState.showAutostartConfirmDialog) {
+        AutostartConfirmDialog(
+            manufacturerName = viewModel.getManufacturerName(),
+            checklist = viewModel.getAutostartChecklist(),
+            onConfirm = { viewModel.confirmAutostartEnabled() },
+            onDismiss = { viewModel.dismissAutostartConfirmDialog() }
+        )
+    }
+
+    // Autostart manual instructions dialog
+    if (uiState.showAutostartManualDialog) {
+        AutostartManualDialog(
+            instructions = viewModel.getAutostartInstructions(),
+            onOpenSettings = { viewModel.openAutostartSettings() },
+            onDismiss = { viewModel.dismissAutostartManualDialog() }
+        )
+    }
+
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.worker_screen_title)) },
@@ -123,6 +166,15 @@ fun WorkerDashboardScreen(
                 }
             }
 
+            // Protection warning card
+            if (uiState.hasProtectionIssues) {
+                Spacer(Modifier.height(12.dp))
+                ProtectionWarningCard(
+                    missingCount = uiState.protectionStatus?.missingItems?.size ?: 0,
+                    onClick = { viewModel.showSetupDialog() }
+                )
+            }
+
             // CENTER: Big Money Button (takes remaining space)
             Box(
                 modifier = Modifier
@@ -155,7 +207,7 @@ fun WorkerDashboardScreen(
                 }
             }
 
-            // BOTTOM: Stats Card (clickable → opens completed tasks)
+            // BOTTOM: Stats Card (clickable -> opens completed tasks)
             StatsCard(
                 completedTasks = uiState.completedTasks,
                 successRate = uiState.successRate,
@@ -167,6 +219,394 @@ fun WorkerDashboardScreen(
         }
     }
 }
+
+// --- Protection Warning Card ---
+
+@Composable
+private fun ProtectionWarningCard(
+    missingCount: Int,
+    onClick: () -> Unit
+) {
+    Card(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Warning.copy(alpha = 0.1f)
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(
+                    Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = Warning,
+                    modifier = Modifier.size(22.dp)
+                )
+                Column {
+                    Text(
+                        text = stringResource(R.string.worker_protection_warning),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TextPrimary
+                    )
+                    Text(
+                        text = stringResource(R.string.worker_protection_warning_count, missingCount),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextTertiary
+                    )
+                }
+            }
+            GlassChip(stringResource(R.string.fix))
+        }
+    }
+}
+
+// --- Device Protection Setup Dialog ---
+
+@Composable
+private fun DeviceProtectionSetupDialog(
+    protectionStatus: DeviceProtectionChecker.ProtectionStatus,
+    onOpenAccessibility: () -> Unit,
+    onOpenNotifications: () -> Unit,
+    onOpenBattery: () -> Unit,
+    onOpenAutostart: () -> Unit,
+    onRetry: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .shadow(
+                    elevation = 24.dp,
+                    shape = RoundedCornerShape(24.dp),
+                    ambientColor = Warning.copy(alpha = 0.3f),
+                    spotColor = BrandCyan.copy(alpha = 0.3f)
+                )
+                .clip(RoundedCornerShape(24.dp))
+                .background(SurfaceDialog)
+                .border(1.dp, BorderStrong, RoundedCornerShape(24.dp))
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Icon
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(CircleShape)
+                        .background(
+                            brush = Brush.linearGradient(
+                                colors = listOf(Warning.copy(alpha = 0.3f), BrandCyan.copy(alpha = 0.3f))
+                            )
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Shield,
+                        contentDescription = null,
+                        tint = Warning,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+
+                Spacer(Modifier.height(16.dp))
+
+                Text(
+                    text = stringResource(R.string.worker_setup_title),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimary
+                )
+
+                Spacer(Modifier.height(4.dp))
+
+                Text(
+                    text = stringResource(R.string.worker_setup_subtitle),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextTertiary,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(Modifier.height(20.dp))
+
+                // Checklist items
+                SetupChecklistItem(
+                    title = stringResource(R.string.worker_setup_accessibility),
+                    subtitle = if (protectionStatus.isAccessibilityOk)
+                        stringResource(R.string.worker_setup_accessibility_ok)
+                    else stringResource(R.string.worker_setup_accessibility_missing),
+                    isOk = protectionStatus.isAccessibilityOk,
+                    onClick = if (!protectionStatus.isAccessibilityOk) onOpenAccessibility else null
+                )
+
+                Spacer(Modifier.height(10.dp))
+
+                SetupChecklistItem(
+                    title = stringResource(R.string.worker_setup_notifications),
+                    subtitle = if (protectionStatus.isNotificationsOk)
+                        stringResource(R.string.worker_setup_notifications_ok)
+                    else stringResource(R.string.worker_setup_notifications_missing),
+                    isOk = protectionStatus.isNotificationsOk,
+                    onClick = if (!protectionStatus.isNotificationsOk) onOpenNotifications else null
+                )
+
+                Spacer(Modifier.height(10.dp))
+
+                SetupChecklistItem(
+                    title = stringResource(R.string.worker_setup_battery),
+                    subtitle = if (protectionStatus.isBatteryOk)
+                        stringResource(R.string.worker_setup_battery_ok)
+                    else stringResource(R.string.worker_setup_battery_missing),
+                    isOk = protectionStatus.isBatteryOk,
+                    onClick = if (!protectionStatus.isBatteryOk) onOpenBattery else null
+                )
+
+                if (protectionStatus.isAutostartRequired) {
+                    Spacer(Modifier.height(10.dp))
+
+                    SetupChecklistItem(
+                        title = stringResource(R.string.worker_setup_autostart, protectionStatus.manufacturerName),
+                        subtitle = if (protectionStatus.isAutostartOk)
+                            stringResource(R.string.worker_setup_autostart_ok)
+                        else stringResource(R.string.worker_setup_autostart_missing),
+                        isOk = protectionStatus.isAutostartOk,
+                        onClick = if (!protectionStatus.isAutostartOk) onOpenAutostart else null
+                    )
+                }
+
+                Spacer(Modifier.height(24.dp))
+
+                // "Check and Start" button
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(
+                            brush = Brush.linearGradient(
+                                colors = listOf(Success, BrandCyan)
+                            )
+                        )
+                        .clickable { onRetry() }
+                        .padding(vertical = 14.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = stringResource(R.string.worker_setup_retry),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                TextButton(onClick = onDismiss) {
+                    Text(
+                        text = stringResource(R.string.worker_setup_later),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = TextTertiary
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SetupChecklistItem(
+    title: String,
+    subtitle: String,
+    isOk: Boolean,
+    onClick: (() -> Unit)?
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(if (isOk) Success.copy(alpha = 0.08f) else Warning.copy(alpha = 0.08f))
+            .border(
+                1.dp,
+                if (isOk) Success.copy(alpha = 0.3f) else Warning.copy(alpha = 0.3f),
+                RoundedCornerShape(14.dp)
+            )
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            if (isOk) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+            contentDescription = null,
+            tint = if (isOk) Success else Warning,
+            modifier = Modifier.size(24.dp)
+        )
+        Spacer(Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = TextPrimary
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = if (isOk) Success else TextTertiary
+            )
+        }
+        if (!isOk) {
+            Icon(
+                Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = TextTertiary,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+}
+
+// --- Autostart Confirm Dialog (reused from SettingsScreen pattern) ---
+
+@Composable
+private fun AutostartConfirmDialog(
+    manufacturerName: String,
+    checklist: List<String>,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val checklistText = checklist.joinToString("\n") { "\u2022 $it" }
+    val message = stringResource(R.string.autostart_confirm_message_generic, manufacturerName) + "\n\n" + checklistText
+
+    Dialog(onDismissRequest = onDismiss) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .shadow(24.dp, RoundedCornerShape(24.dp), ambientColor = Success.copy(alpha = 0.3f), spotColor = BrandCyan.copy(alpha = 0.3f))
+                .clip(RoundedCornerShape(24.dp))
+                .background(SurfaceDialog)
+                .border(1.dp, BorderStrong, RoundedCornerShape(24.dp))
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(CircleShape)
+                        .background(Brush.linearGradient(listOf(Success.copy(alpha = 0.3f), BrandCyan.copy(alpha = 0.3f)))),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.PhonelinkSetup, null, tint = Success, modifier = Modifier.size(28.dp))
+                }
+                Spacer(Modifier.height(16.dp))
+                Text(stringResource(R.string.autostart_confirm_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = TextPrimary)
+                Spacer(Modifier.height(8.dp))
+                Text(message, style = MaterialTheme.typography.bodyMedium, color = TextSecondary, modifier = Modifier.padding(horizontal = 8.dp))
+                Spacer(Modifier.height(24.dp))
+                Box(
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
+                        .background(Brush.linearGradient(listOf(Success, BrandCyan)))
+                        .clickable { onConfirm() }.padding(vertical = 14.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(stringResource(R.string.autostart_confirm_yes), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = Color.White)
+                }
+                Spacer(Modifier.height(12.dp))
+                TextButton(onClick = onDismiss) {
+                    Text(stringResource(R.string.autostart_confirm_no), style = MaterialTheme.typography.labelMedium, color = TextTertiary)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AutostartManualDialog(
+    instructions: String,
+    onOpenSettings: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .shadow(24.dp, RoundedCornerShape(24.dp), ambientColor = BrandPink.copy(alpha = 0.3f), spotColor = BrandCyan.copy(alpha = 0.3f))
+                .clip(RoundedCornerShape(24.dp))
+                .background(SurfaceDialog)
+                .border(1.dp, BorderStrong, RoundedCornerShape(24.dp))
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(CircleShape)
+                        .background(Brush.linearGradient(listOf(BrandPink.copy(alpha = 0.3f), BrandCyan.copy(alpha = 0.3f)))),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.Settings, null, tint = BrandPink, modifier = Modifier.size(28.dp))
+                }
+                Spacer(Modifier.height(16.dp))
+                Text(stringResource(R.string.autostart_manual_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = TextPrimary)
+                Spacer(Modifier.height(8.dp))
+                Text(stringResource(R.string.autostart_manual_message, instructions), style = MaterialTheme.typography.bodyMedium, color = TextSecondary, modifier = Modifier.padding(horizontal = 8.dp))
+                Spacer(Modifier.height(24.dp))
+                Box(
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
+                        .background(Brush.linearGradient(listOf(BrandPink, BrandCyan)))
+                        .clickable { onOpenSettings() }.padding(vertical = 14.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(stringResource(R.string.autostart_manual_open_settings), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = Color.White)
+                }
+                Spacer(Modifier.height(12.dp))
+                TextButton(onClick = onDismiss) {
+                    Text(stringResource(R.string.autostart_manual_done), style = MaterialTheme.typography.labelMedium, color = TextTertiary)
+                }
+            }
+        }
+    }
+}
+
+// --- Shared UI Components ---
+
+@Composable
+private fun GlassChip(text: String) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(
+                brush = Brush.linearGradient(
+                    colors = listOf(BrandCyan, BrandPink)
+                )
+            )
+            .padding(horizontal = 14.dp, vertical = 6.dp)
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = Color.White
+        )
+    }
+}
+
+// --- Existing Components ---
 
 @Composable
 private fun IncomeCard(
@@ -217,6 +657,15 @@ private fun MoneyButton(
     isToggling: Boolean,
     onClick: () -> Unit
 ) {
+    // Money sound effect
+    val context = LocalContext.current
+    val mediaPlayer = remember {
+        MediaPlayer.create(context, R.raw.money_button)
+    }
+    DisposableEffect(Unit) {
+        onDispose { mediaPlayer?.release() }
+    }
+
     // Press animation
     var isPressed by remember { mutableStateOf(false) }
     val pressScale by animateFloatAsState(
@@ -250,23 +699,23 @@ private fun MoneyButton(
         label = "glow_alpha"
     )
 
-    // Red gradient - inactive state (объёмный эффект)
+    // Red gradient - inactive state
     val redGradient = Brush.verticalGradient(
         colors = listOf(
-            Color(0xFFFF6B6B), // Lighter red top (highlight)
-            Color(0xFFEE4444), // Main red
-            Color(0xFFCC2222), // Darker red bottom (shadow)
-            Color(0xFFAA1111)  // Deep red edge
+            Color(0xFFFF6B6B),
+            Color(0xFFEE4444),
+            Color(0xFFCC2222),
+            Color(0xFFAA1111)
         )
     )
 
-    // Green gradient - active state (объёмный эффект)
+    // Green gradient - active state
     val greenGradient = Brush.verticalGradient(
         colors = listOf(
-            Color(0xFF6BFF6B), // Lighter green top (highlight)
-            Color(0xFF44EE44), // Main green
-            Color(0xFF22CC22), // Darker green bottom (shadow)
-            Color(0xFF11AA11)  // Deep green edge
+            Color(0xFF6BFF6B),
+            Color(0xFF44EE44),
+            Color(0xFF22CC22),
+            Color(0xFF11AA11)
         )
     )
 
@@ -278,7 +727,6 @@ private fun MoneyButton(
         contentAlignment = Alignment.Center,
         modifier = Modifier.fillMaxWidth()
     ) {
-        // Calculate button size based on available width (90% of width, but keep it circular)
         val buttonSize = (maxWidth * 0.85f).coerceAtMost(320.dp)
         val glowSize = buttonSize + 20.dp
 
@@ -303,9 +751,14 @@ private fun MoneyButton(
                 )
         )
 
-        // Main button - fills most of the width
+        // Main button
         Button(
-            onClick = onClick,
+            onClick = {
+                mediaPlayer?.let { mp ->
+                    if (mp.isPlaying) mp.seekTo(0) else mp.start()
+                }
+                onClick()
+            },
             enabled = !isToggling,
             modifier = Modifier
                 .size(buttonSize)
@@ -350,7 +803,6 @@ private fun MoneyButton(
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                // Inner highlight for 3D effect
                 Box(
                     modifier = Modifier
                         .fillMaxSize()

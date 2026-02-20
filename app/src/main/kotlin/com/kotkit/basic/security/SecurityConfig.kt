@@ -1,14 +1,16 @@
 package com.kotkit.basic.security
 
 object SecurityConfig {
-    // SSL Pinning hosts - Updated 2026-01-29 for Fly.io backend (монолит)
+    // SSL Pinning hosts
     const val API_HOST = "kotkit-app.fly.dev"
+    const val API_HOST_PUBLIC = "kotkit.pro"
 
-    // Certificate pins (SHA-256) - kotkit-app.fly.dev
-    // Generated: 2026-01-29
-    val CERTIFICATE_PINS = listOf(
-        "sha256/1v+R//jEMn05LRXJ17Cs8GIiV0/In3BIqhadtHKxhn0=", // kotkit-app.fly.dev primary
-        "sha256/C5+lpZ7tcVwmwQIMcRtPbsQtWLABXhQzejna0wHFr8M="  // Let's Encrypt ISRG Root X1 (backup)
+    // Certificate pins (SHA-256 SPKI) — pinned to CA, not leaf certs.
+    // Leaf certs rotate every 90 days; CA pins are stable for years.
+    // Both domains use Let's Encrypt, so they share the same CA pins.
+    val CA_PINS = listOf(
+        "sha256/C5+lpZ7tcVwmwQIMcRtPbsQtWLABXhQzejna0wHFr8M=", // ISRG Root X1 (Let's Encrypt root, valid until 2035)
+        "sha256/y7xVm0TVJNahMr2sZydE2jQH8SquXV9yLF9seROHHHU="  // Let's Encrypt E7 intermediate (current active)
     )
 
     // Allowed TikTok packages

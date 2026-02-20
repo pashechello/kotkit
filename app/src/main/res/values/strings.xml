@@ -79,8 +79,9 @@
 
     <!-- TikTok Username -->
     <string name="settings_tiktok">TikTok</string>
-    <string name="settings_tiktok_username">TikTok Username</string>
+    <string name="settings_tiktok_username">TikTok Account</string>
     <string name="settings_tiktok_not_set">Not set</string>
+    <string name="settings_tiktok_login_required">Log in to set TikTok username</string>
     <string name="tiktok_username_dialog_title">Enter TikTok Username</string>
     <string name="tiktok_username_dialog_subtitle">Required for Worker Mode. We\'ll verify your posts on this profile.</string>
     <string name="tiktok_username_hint">username</string>
@@ -126,17 +127,20 @@
     <string name="settings_unlock_credentials">Unlock Credentials</string>
     <string name="settings_pin_saved">PIN saved</string>
     <string name="settings_password_saved">Password saved</string>
+    <string name="settings_no_pin_mode">No PIN (swipe unlock)</string>
     <string name="settings_not_configured">Not configured - Required for scheduled posts</string>
     <string name="settings_worker_reliability">For stable operation</string>
     <string name="settings_battery_optimization">Battery Optimization</string>
     <string name="settings_battery_disabled">Disabled - Worker mode runs reliably</string>
     <string name="settings_battery_enabled">Enabled - May stop background tasks</string>
+    <string name="settings_battery_action">Disable</string>
     <string name="settings_oem_autostart">%1$s Permissions</string>
     <string name="settings_oem_autostart_subtitle">Required for %1$s devices to post from background</string>
     <string name="settings_oem_autostart_enabled">Enabled - Background posting works</string>
-    <string name="autostart_confirm_title">Permissions Enabled?</string>
-    <string name="autostart_confirm_message">Did you enable ALL permissions for KotKit?\n\n• Autostart\n• Show on lock screen\n• Pop-up windows</string>
-    <string name="autostart_confirm_yes">Yes, all enabled</string>
+    <string name="autostart_confirm_title">Done?</string>
+    <string name="autostart_confirm_message">Did you enable autostart for KotKit?</string>
+    <string name="autostart_confirm_message_generic">Did you enable background work for KotKit on your %1$s?</string>
+    <string name="autostart_confirm_yes">Yes, enabled</string>
     <string name="autostart_confirm_no">Not yet</string>
     <string name="autostart_manual_title">Enable Manually</string>
     <string name="autostart_manual_message">Could not open settings automatically.\n\nPlease enable permissions manually:\n\n%1$s</string>
@@ -144,9 +148,32 @@
     <string name="autostart_manual_done">Done</string>
     <string name="fix">Fix</string>
 
+    <!-- Device Protection Setup Dialog -->
+    <string name="worker_setup_title">Setup Device</string>
+    <string name="worker_setup_subtitle">Enable all protections for stable worker operation</string>
+    <string name="worker_setup_retry">Check and Start</string>
+    <string name="worker_setup_later">Later</string>
+    <string name="worker_setup_accessibility">Accessibility Service</string>
+    <string name="worker_setup_accessibility_ok">Enabled</string>
+    <string name="worker_setup_accessibility_missing">Not enabled</string>
+    <string name="worker_setup_notifications">Notifications</string>
+    <string name="worker_setup_notifications_ok">Enabled</string>
+    <string name="worker_setup_notifications_missing">Disabled — service will be killed</string>
+    <string name="worker_setup_battery">Battery Optimization</string>
+    <string name="worker_setup_battery_ok">Disabled</string>
+    <string name="worker_setup_battery_missing">Needs to be disabled</string>
+    <string name="worker_setup_autostart">%1$s Autostart</string>
+    <string name="worker_setup_autostart_ok">Configured</string>
+    <string name="worker_setup_autostart_missing">Needs setup</string>
+    <string name="worker_protection_warning">Not all protections configured</string>
+    <string name="worker_protection_warning_count">%1$d item(s) need attention</string>
+    <string name="worker_accessibility_dead_title">Accessibility Service Crashed</string>
+    <string name="worker_accessibility_dead_message">Worker cannot execute tasks. Tap to fix.</string>
+    <string name="worker_accessibility_dead_instructions">The system stopped the accessibility service.\n\n1. Tap this notification\n2. Find \"KotKit\" in the list\n3. Toggle it OFF, then ON\n\nThis will restore task execution.</string>
+
     <!-- Caption Preferences Screen -->
     <string name="caption_prefs_title">Caption Style</string>
-    <string name="caption_prefs_saved">Settings saved!</string>
+    <string name="caption_prefs_saved">Meow! Settings saved 😸</string>
     <string name="caption_prefs_customize_title">Customize Your Caption Style</string>
     <string name="caption_prefs_customize_desc">Set your preferred tone, style, and hashtags. The AI will generate captions matching your preferences.</string>
     <string name="caption_prefs_use_custom">Use Custom Tone</string>
@@ -183,11 +210,13 @@
     <string name="unlock_enter_pin">Enter your device PIN</string>
     <string name="unlock_enter_password">Enter your device password</string>
     <string name="unlock_toggle_visibility">Toggle password visibility</string>
-    <string name="unlock_saved">Saved successfully</string>
-    <string name="unlock_pin_error">PIN must be at least 4 digits</string>
-    <string name="unlock_password_error">Password cannot be empty</string>
+    <string name="unlock_saved">Purr-fect! Saved 🐾</string>
+    <string name="unlock_pin_error">Hiss! PIN needs at least 4 digits 🙀</string>
+    <string name="unlock_password_error">Meow! Password can\'t be empty 🙀</string>
     <string name="unlock_clear">Clear Saved Credentials</string>
-    <string name="unlock_cleared">Credentials cleared</string>
+    <string name="unlock_cleared">Poof! Credentials cleared 🐾</string>
+    <string name="unlock_no_pin">No PIN</string>
+    <string name="unlock_no_pin_info">Your device has no lock screen PIN or password. The app will unlock the screen by swiping.</string>
 
     <!-- PostCard Component -->
     <string name="post_no_caption">(No caption)</string>
@@ -303,8 +332,8 @@
     <string name="auth_required_worker">Log in to access earning features</string>
     <string name="auth_login_via_website">Log In via Website</string>
     <string name="auth_later">Later</string>
-    <string name="auth_session_expired">Session expired. Please log in again.</string>
-    <string name="auth_login_success">Logged in successfully!</string>
+    <string name="auth_session_expired">Meow… Session expired, log in again 😿</string>
+    <string name="auth_login_success">Welcome back! 😻</string>
     <string name="error_auth_required_for_schedule">Please log in to schedule posts</string>
     <string name="error_select_video">Please select a video</string>
     <string name="error_select_future_time">Please select a future time</string>

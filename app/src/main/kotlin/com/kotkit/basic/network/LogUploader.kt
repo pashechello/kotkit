@@ -2,7 +2,7 @@ package com.kotkit.basic.network
 
 import android.content.Context
 import android.content.SharedPreferences
-import android.util.Log
+import timber.log.Timber
 import com.kotkit.basic.data.remote.api.ApiService
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -11,7 +11,6 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
-import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
 import java.text.SimpleDateFormat
@@ -64,36 +63,40 @@ class LogUploader @Inject constructor(
 
                 // Skip past dates that were already uploaded
                 if (!isToday && isDateUploaded(date)) {
-                    Log.d(TAG, "Log for $date already uploaded, skipping")
+                    Timber.tag(TAG).d("Log for $date already uploaded, skipping")
                     return@withContext true
                 }
 
                 val logFile = File(logDir, "kotkit_$date.log")
                 if (!logFile.exists()) {
-                    Log.d(TAG, "No log file for $date")
+                    Timber.tag(TAG).d("No log file for $date")
                     return@withContext false
                 }
 
                 if (logFile.length() > MAX_FILE_SIZE) {
-                    Log.w(TAG, "Log file too large: ${logFile.length()} bytes, skipping")
+                    Timber.tag(TAG).w("Log file too large: ${logFile.length()} bytes, skipping")
                     return@withContext false
                 }
 
                 if (logFile.length() == 0L) {
-                    Log.d(TAG, "Log file empty for $date, skipping")
+                    Timber.tag(TAG).d("Log file empty for $date, skipping")
                     return@withContext false
                 }
+
+                // Snapshot file bytes (file is actively written to by Timber,
+                // so streaming via asRequestBody causes Content-Length mismatch)
+                val bytes = logFile.readBytes()
 
                 // Build multipart request
                 val filePart = MultipartBody.Part.createFormData(
                     "file",
                     logFile.name,
-                    logFile.asRequestBody("text/plain".toMediaType())
+                    bytes.toRequestBody("text/plain".toMediaType())
                 )
                 val datePart = date.toRequestBody("text/plain".toMediaType())
 
                 val response = apiService.uploadLogFile(filePart, datePart)
-                Log.i(TAG, "Uploaded log for $date: ${response.sizeBytes} bytes -> ${response.s3Key}")
+                Timber.tag(TAG).i("Uploaded log for $date: ${response.sizeBytes} bytes -> ${response.s3Key}")
 
                 // Mark past dates as uploaded (today always re-uploads)
                 if (!isToday) {
@@ -102,7 +105,7 @@ class LogUploader @Inject constructor(
 
                 return@withContext true
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to upload log for $date", e)
+                Timber.tag(TAG).e(e, "Failed to upload log for $date")
                 return@withContext false
             }
         }
@@ -122,7 +125,7 @@ class LogUploader @Inject constructor(
             uploadLog(yesterday)
             uploadLog(today)
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to upload pending logs", e)
+            Timber.tag(TAG).e(e, "Failed to upload pending logs")
         }
     }
 

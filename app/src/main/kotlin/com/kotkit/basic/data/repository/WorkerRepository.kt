@@ -3,7 +3,7 @@ package com.kotkit.basic.data.repository
 import android.content.Context
 import android.os.Build
 import android.provider.Settings
-import android.util.Log
+import timber.log.Timber
 import com.kotkit.basic.BuildConfig
 import com.kotkit.basic.data.local.db.WorkerEarningDao
 import com.kotkit.basic.data.local.db.WorkerProfileDao
@@ -11,6 +11,7 @@ import com.kotkit.basic.data.local.db.entities.WorkerEarningEntity
 import com.kotkit.basic.data.local.db.entities.WorkerProfileEntity
 import com.kotkit.basic.data.remote.api.ApiService
 import com.kotkit.basic.data.remote.api.models.BalanceResponse
+import com.kotkit.basic.data.remote.api.models.PayoutListResponse
 import com.kotkit.basic.data.remote.api.models.PayoutRequestCreate
 import com.kotkit.basic.data.remote.api.models.PayoutResponse
 import com.kotkit.basic.data.remote.api.models.RegisterDeviceRequest
@@ -52,7 +53,7 @@ class WorkerRepository @Inject constructor(
     ): Boolean {
         val toggleTime = lastToggleTimestamp.get()
         if (operationStartTime < toggleTime) {
-            Log.w(TAG, "Skipping stale profile insert: opTime=$operationStartTime < toggleTime=$toggleTime, isActive=${entity.isActive}")
+            Timber.tag(TAG).w("Skipping stale profile insert: opTime=$operationStartTime < toggleTime=$toggleTime, isActive=${entity.isActive}")
             return false
         }
         workerProfileDao.insert(entity)
@@ -96,10 +97,10 @@ class WorkerRepository @Inject constructor(
             )
             val entity = response.toEntity()
             workerProfileDao.insert(entity)
-            Log.i(TAG, "Worker registered: ${entity.id}")
+            Timber.tag(TAG).i("Worker registered: ${entity.id}")
             Result.success(entity)
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to register worker", e)
+            Timber.tag(TAG).e(e, "Failed to register worker")
             Result.failure(e)
         }
     }
@@ -107,21 +108,21 @@ class WorkerRepository @Inject constructor(
     suspend fun fetchAndSyncProfile(): Result<WorkerProfileEntity> {
         val fetchStartTime = System.currentTimeMillis()
         return try {
-            Log.i(TAG, "Fetching profile from API... (startTime=$fetchStartTime)")
+            Timber.tag(TAG).i("Fetching profile from API... (startTime=$fetchStartTime)")
             val response = apiService.getWorkerProfile()
-            Log.i(TAG, "Profile API response: is_active=${response.isActive}, id=${response.id}")
+            Timber.tag(TAG).i("Profile API response: is_active=${response.isActive}, id=${response.id}")
             val entity = response.toEntity()
 
             val inserted = insertProfileIfNotStale(entity, fetchStartTime)
             if (inserted) {
-                Log.i(TAG, "Profile synced to DB: isActive=${entity.isActive}")
+                Timber.tag(TAG).i("Profile synced to DB: isActive=${entity.isActive}")
             } else {
-                Log.i(TAG, "Profile sync SKIPPED (stale): isActive=${entity.isActive}")
+                Timber.tag(TAG).i("Profile sync SKIPPED (stale): isActive=${entity.isActive}")
             }
 
             Result.success(entity)
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to fetch profile", e)
+            Timber.tag(TAG).e(e, "Failed to fetch profile")
             Result.failure(e)
         }
     }
@@ -141,10 +142,24 @@ class WorkerRepository @Inject constructor(
             )
             val entity = response.toEntity()
             workerProfileDao.insert(entity)
-            Log.i(TAG, "TikTok username updated: @$username")
+            Timber.tag(TAG).i("TikTok username updated: @$username")
             Result.success(entity)
+        } catch (e: retrofit2.HttpException) {
+            if (e.code() == 404) {
+                // Worker profile doesn't exist yet — register first
+                Timber.tag(TAG).i("Worker profile not found (404), registering worker with username: @$username")
+                registerWorker(
+                    tiktokUsername = username,
+                    categoryIds = null,
+                    countryCode = null,
+                    timezone = null
+                )
+            } else {
+                Timber.tag(TAG).e(e, "Failed to update TikTok username: HTTP ${e.code()}")
+                Result.failure(e)
+            }
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to update TikTok username", e)
+            Timber.tag(TAG).e(e, "Failed to update TikTok username")
             Result.failure(e)
         }
     }
@@ -156,18 +171,18 @@ class WorkerRepository @Inject constructor(
 
         return try {
             val request = WorkerToggleRequest(isActive)
-            Log.i(TAG, "Toggle API call: requesting isActive=$isActive (toggleTime=$toggleStartTime)")
+            Timber.tag(TAG).i("Toggle API call: requesting isActive=$isActive (toggleTime=$toggleStartTime)")
             val response = apiService.toggleWorkerMode(request)
-            Log.i(TAG, "Toggle API response: is_active=${response.isActive}, requested=$isActive, match=${response.isActive == isActive}")
+            Timber.tag(TAG).i("Toggle API response: is_active=${response.isActive}, requested=$isActive, match=${response.isActive == isActive}")
             val entity = response.toEntity()
 
             // Toggle response is always authoritative - no stale check needed
             workerProfileDao.insert(entity)
-            Log.i(TAG, "Toggle saved to DB: isActive=${entity.isActive}")
+            Timber.tag(TAG).i("Toggle saved to DB: isActive=${entity.isActive}")
 
             Result.success(entity)
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to toggle worker mode", e)
+            Timber.tag(TAG).e(e, "Failed to toggle worker mode")
             Result.failure(e)
         }
     }
@@ -189,10 +204,10 @@ class WorkerRepository @Inject constructor(
                     successRate = if (stats.weekTasks > 0) stats.weekCompleted.toFloat() / stats.weekTasks else 0f
                 )
             }
-            Log.i(TAG, "Stats fetched: ${stats.todayCompleted}/${stats.todayTasks}")
+            Timber.tag(TAG).i("Stats fetched: ${stats.todayCompleted}/${stats.todayTasks}")
             Result.success(stats)
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to fetch stats", e)
+            Timber.tag(TAG).e(e, "Failed to fetch stats")
             Result.failure(e)
         }
     }
@@ -218,10 +233,10 @@ class WorkerRepository @Inject constructor(
                     fcmToken = fcmToken
                 )
             )
-            Log.i(TAG, "Device registered: $deviceModel")
+            Timber.tag(TAG).i("Device registered: $deviceModel")
             Result.success(Unit)
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to register device", e)
+            Timber.tag(TAG).e(e, "Failed to register device")
             Result.failure(e)
         }
     }
@@ -245,10 +260,10 @@ class WorkerRepository @Inject constructor(
                     available = balance.availableBalance
                 )
             }
-            Log.i(TAG, "Balance fetched: available=${balance.availableBalance}")
+            Timber.tag(TAG).i("Balance fetched: available=${balance.availableBalance}")
             Result.success(balance)
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to fetch balance", e)
+            Timber.tag(TAG).e(e, "Failed to fetch balance")
             Result.failure(e)
         }
     }
@@ -258,10 +273,10 @@ class WorkerRepository @Inject constructor(
             val response = apiService.getEarnings(limit, offset)
             val entities = response.earnings.map { it.toEntity() }
             workerEarningDao.insertAll(entities)
-            Log.i(TAG, "Fetched ${entities.size} earnings")
+            Timber.tag(TAG).i("Fetched ${entities.size} earnings")
             Result.success(entities)
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to fetch earnings", e)
+            Timber.tag(TAG).e(e, "Failed to fetch earnings")
             Result.failure(e)
         }
     }
@@ -286,14 +301,14 @@ class WorkerRepository @Inject constructor(
         return try {
             val response = apiService.workerHeartbeat()
             if (response.ok) {
-                Log.d(TAG, "Worker heartbeat sent, last_active_at=${response.lastActiveAt}")
+                Timber.tag(TAG).d("Worker heartbeat sent, last_active_at=${response.lastActiveAt}")
                 Result.success(Unit)
             } else {
-                Log.w(TAG, "Worker heartbeat returned ok=false")
+                Timber.tag(TAG).w("Worker heartbeat returned ok=false")
                 Result.failure(Exception("Heartbeat failed"))
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to send worker heartbeat", e)
+            Timber.tag(TAG).e(e, "Failed to send worker heartbeat")
             Result.failure(e)
         }
     }
@@ -307,10 +322,10 @@ class WorkerRepository @Inject constructor(
     suspend fun sendWorkerOffline(): Result<Unit> {
         return try {
             val response = apiService.workerOffline()
-            Log.i(TAG, "Worker offline notification sent")
+            Timber.tag(TAG).i("Worker offline notification sent")
             Result.success(Unit)
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to send offline notification (expected)", e)
+            Timber.tag(TAG).w(e, "Failed to send offline notification (expected)")
             Result.failure(e)
         }
     }
@@ -334,10 +349,31 @@ class WorkerRepository @Inject constructor(
                     walletAddress = walletAddress
                 )
             )
-            Log.i(TAG, "Payout requested: $amountRub via $method")
+            Timber.tag(TAG).i("Payout requested: $amountRub via $method")
             Result.success(response)
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to request payout", e)
+            Timber.tag(TAG).e(e, "Failed to request payout")
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getPayoutHistory(limit: Int = 20): Result<PayoutListResponse> {
+        return try {
+            val response = apiService.getPayoutHistory(limit = limit)
+            Result.success(response)
+        } catch (e: Exception) {
+            Timber.tag(TAG).e(e, "Failed to fetch payout history")
+            Result.failure(e)
+        }
+    }
+
+    suspend fun cancelPayout(payoutId: String): Result<PayoutResponse> {
+        return try {
+            val response = apiService.cancelPayout(payoutId)
+            Timber.tag(TAG).i("Payout cancelled: $payoutId")
+            Result.success(response)
+        } catch (e: Exception) {
+            Timber.tag(TAG).e(e, "Failed to cancel payout: $payoutId")
             Result.failure(e)
         }
     }
@@ -361,10 +397,10 @@ class WorkerRepository @Inject constructor(
                 )
 
                 val response = apiService.registerDevice(request)
-                Log.i(TAG, "FCM token registered: ${response.id}")
+                Timber.tag(TAG).i("FCM token registered: ${response.id}")
                 true
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to register FCM token", e)
+                Timber.tag(TAG).e(e, "Failed to register FCM token")
                 false
             }
         }

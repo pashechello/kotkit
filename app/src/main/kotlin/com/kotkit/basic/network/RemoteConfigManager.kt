@@ -1,6 +1,6 @@
 package com.kotkit.basic.network
 
-import android.util.Log
+import timber.log.Timber
 import com.google.gson.Gson
 import com.kotkit.basic.BuildConfig
 import com.kotkit.basic.data.local.db.SelectorsConfigDao
@@ -50,13 +50,13 @@ class RemoteConfigManager @Inject constructor(
      * Loads cached config and refreshes from server.
      */
     suspend fun initialize() {
-        Log.i(TAG, "Initializing remote config")
+        Timber.tag(TAG).i("Initializing remote config")
 
         try {
             // Load cached selectors
             val cached = selectorsConfigDao.getConfig()
             if (cached != null) {
-                Log.i(TAG, "Loaded cached selectors version ${cached.version}")
+                Timber.tag(TAG).i("Loaded cached selectors version ${cached.version}")
             }
 
             // Refresh from server (non-blocking errors)
@@ -65,10 +65,10 @@ class RemoteConfigManager @Inject constructor(
             refreshFeatureFlags()
 
             _isInitialized.value = true
-            Log.i(TAG, "Remote config initialized")
+            Timber.tag(TAG).i("Remote config initialized")
 
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to initialize remote config", e)
+            Timber.tag(TAG).e(e, "Failed to initialize remote config")
             // Still mark as initialized with cached/default values
             _isInitialized.value = true
         }
@@ -98,10 +98,10 @@ class RemoteConfigManager @Inject constructor(
             val response = apiService.getSelectorsConfig(BuildConfig.VERSION_NAME)
             val entity = response.toEntity()
             selectorsConfigDao.insert(entity)
-            Log.i(TAG, "Selectors updated to version ${response.version}")
+            Timber.tag(TAG).i("Selectors updated to version ${response.version}")
             Result.success(entity)
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to refresh selectors", e)
+            Timber.tag(TAG).e(e, "Failed to refresh selectors")
             Result.failure(e)
         }
     }
@@ -156,14 +156,14 @@ class RemoteConfigManager @Inject constructor(
 
             // Check for force update
             if (response.forceUpdate && isVersionLower(BuildConfig.VERSION_NAME, response.minSupportedVersion)) {
-                Log.w(TAG, "Force update required! Min version: ${response.minSupportedVersion}")
+                Timber.tag(TAG).w("Force update required! Min version: ${response.minSupportedVersion}")
                 _needsForceUpdate.value = true
             }
 
-            Log.i(TAG, "App config updated: maxDailyPosts=${response.maxDailyPosts}")
+            Timber.tag(TAG).i("App config updated: maxDailyPosts=${response.maxDailyPosts}")
             Result.success(response)
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to refresh app config", e)
+            Timber.tag(TAG).e(e, "Failed to refresh app config")
             Result.failure(e)
         }
     }
@@ -198,10 +198,10 @@ class RemoteConfigManager @Inject constructor(
         return try {
             val response = apiService.getFeatureFlags()
             featureFlags = response
-            Log.i(TAG, "Feature flags updated: ${response.features.size} features, ${response.experiments.size} experiments")
+            Timber.tag(TAG).i("Feature flags updated: ${response.features.size} features, ${response.experiments.size} experiments")
             Result.success(response)
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to refresh feature flags", e)
+            Timber.tag(TAG).e(e, "Failed to refresh feature flags")
             Result.failure(e)
         }
     }
@@ -252,7 +252,7 @@ class RemoteConfigManager @Inject constructor(
         return try {
             gson.fromJson(json, Map::class.java) as? Map<String, String> ?: emptyMap()
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to parse selectors map", e)
+            Timber.tag(TAG).e(e, "Failed to parse selectors map")
             emptyMap()
         }
     }

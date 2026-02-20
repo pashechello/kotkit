@@ -58,6 +58,7 @@ import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import com.kotkit.basic.executor.accessibility.portal.UITree
 import com.kotkit.basic.executor.accessibility.portal.UITreeParser
+import com.kotkit.basic.executor.screenshot.MediaProjectionScreenshot
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -72,6 +73,9 @@ class TikTokAccessibilityService : AccessibilityService() {
     companion object {
         private const val TAG = "TikTokA11yService"
         private const val SERVICE_ID = "com.kotkit.basic/.executor.accessibility.TikTokAccessibilityService"
+
+        /** Must match NetworkWorkerService.ACCESSIBILITY_DEAD_NOTIFICATION_ID */
+        private const val ACCESSIBILITY_DEAD_NOTIFICATION_ID = 10003
 
         // Test actions
         const val ACTION_TEST_TAP = "com.kotkit.basic.TEST_TAP"
@@ -100,6 +104,19 @@ class TikTokAccessibilityService : AccessibilityService() {
             "com.ss.android.ugc.aweme",      // TikTok (Chinese/legacy)
             "com.zhiliaoapp.musically.go",   // TikTok Go (emerging markets)
             "musical.ly"                      // Old Musical.ly (legacy)
+        )
+
+        /**
+         * Packages that own the lockscreen/keyguard across different OEMs.
+         * Used to decide whether to press HOME to surface the keyguard.
+         * On EMUI 12, the keyguard is owned by com.huawei.android.launcher,
+         * not com.android.systemui as on AOSP/MIUI.
+         */
+        private val LOCKSCREEN_PACKAGES = setOf(
+            "com.android.systemui",           // AOSP / Pixel / MIUI keyguard
+            "com.huawei.android.launcher",    // EMUI 10-12 keyguard
+            "com.huawei.systemserver",        // EMUI some variants
+            "com.samsung.android.keyguard",   // Samsung One UI (some versions)
         )
 
         @Volatile
@@ -150,7 +167,22 @@ class TikTokAccessibilityService : AccessibilityService() {
         // Register test tap receiver
         registerTestReceiver()
 
+        // Clear any "accessibility crashed" notification now that we're back
+        clearCrashNotification()
+
         Timber.tag(TAG).i("Accessibility Service connected - restricted to TikTok only")
+    }
+
+    /**
+     * Clear the crash notification that NetworkWorkerService may have posted.
+     * Called on (re)connect so the user doesn't see a stale warning.
+     */
+    private fun clearCrashNotification() {
+        try {
+            val notificationManager = getSystemService(android.app.NotificationManager::class.java)
+            notificationManager?.cancel(ACCESSIBILITY_DEAD_NOTIFICATION_ID)
+            Timber.tag(TAG).d("Cleared accessibility crash notification (if any)")
+        } catch (_: Exception) { /* ignore */ }
     }
 
     /**
@@ -337,8 +369,10 @@ class TikTokAccessibilityService : AccessibilityService() {
             // 3. Bring lockscreen to foreground if our app is active
             // On MIUI, our app may render above the keyguard after screen wake.
             // HOME press surfaces the lockscreen so swipe targets the correct layer.
+            // On EMUI 12, the keyguard is owned by com.huawei.android.launcher (not com.android.systemui).
             val activeRoot = rootInActiveWindow?.packageName?.toString()
-            if (activeRoot != null && activeRoot != "com.android.systemui") {
+            val isAlreadyOnLockscreen = activeRoot == null || activeRoot in LOCKSCREEN_PACKAGES
+            if (!isAlreadyOnLockscreen) {
                 Timber.tag(TAG).i("enterPin: active window is $activeRoot, pressing HOME to surface keyguard")
                 performGlobalAction(GLOBAL_ACTION_HOME)
                 kotlinx.coroutines.delay(500)
@@ -355,9 +389,24 @@ class TikTokAccessibilityService : AccessibilityService() {
             val maxSwipeAttempts = 2
             for (attempt in 1..maxSwipeAttempts) {
                 val currentRoot = rootInActiveWindow?.packageName?.toString()
-                Timber.tag(TAG).i("enterPin: swipe attempt $attempt/$maxSwipeAttempts (activeRoot=$currentRoot)")
-                swipe(swipeX, swipeStartY, swipeX, swipeEndY, 300)
+                Timber.tag(TAG).i("enterPin: attempt $attempt/$maxSwipeAttempts (activeRoot=$currentRoot)")
 
+                // Try lock icon first (Pixel/AOSP fast path)
+                val clickedLockIcon = tryClickLockIcon()
+                if (clickedLockIcon) {
+                    Timber.tag(TAG).i("enterPin: clicked lock icon, checking for bouncer")
+                    // Quick check: did the lock icon actually bring up the PIN pad?
+                    initialCoords = pollForPinPad(maxWaitMs = 1500, pollIntervalMs = 200)
+                    if (initialCoords != null) {
+                        Timber.tag(TAG).i("enterPin: lock icon worked, PIN pad appeared")
+                        break
+                    }
+                    // Lock icon click didn't produce PIN pad (Samsung false positive or timing)
+                    Timber.tag(TAG).w("enterPin: lock icon clicked but no PIN pad, falling back to swipe")
+                }
+
+                // Swipe up (MIUI, Samsung, and fallback for failed lock icon click)
+                swipe(swipeX, swipeStartY, swipeX, swipeEndY, 300)
                 initialCoords = pollForPinPad(maxWaitMs = 4000, pollIntervalMs = 200)
                 if (initialCoords != null) break
 
@@ -376,8 +425,10 @@ class TikTokAccessibilityService : AccessibilityService() {
 
             // Wait for PIN pad animation to fully settle before tapping
             // MIUI keyguard animates the PIN pad sliding up; coordinates captured mid-animation
-            // can be slightly off from final positions, causing taps to miss
-            kotlinx.coroutines.delay(400)
+            // can be slightly off from final positions, causing taps to miss.
+            // EMUI 12 keyguard animation also needs extra time — use 600ms there.
+            val pinPadSettleMs = if (Build.MANUFACTURER?.lowercase()?.contains("huawei") == true) 600L else 400L
+            kotlinx.coroutines.delay(pinPadSettleMs)
 
             // Re-capture coordinates after animation settles for accurate positions
             val pinPadCoords = getPinPadCoordinates() ?: initialCoords
@@ -395,14 +446,128 @@ class TikTokAccessibilityService : AccessibilityService() {
                 kotlinx.coroutines.delay(150)
             }
 
-            Timber.tag(TAG).i("enterPin: PIN entry complete")
-            // Wait for keyguard to process the last digit before restoring filter
+            Timber.tag(TAG).i("enterPin: all digits entered, looking for Enter button")
+
+            // On Pixel/AOSP, PIN pad requires explicit Enter press to confirm
+            // (MIUI auto-submits after correct digit count, but AOSP does not)
+            val enterTapped = tapEnterButton()
+            Timber.tag(TAG).i("enterPin: Enter button tapped=$enterTapped")
+
+            // Wait for keyguard to process before restoring filter
             kotlinx.coroutines.delay(500)
             return true
         } finally {
             // Always restore TikTok-only filter
             restorePackageFilter()
         }
+    }
+
+    /**
+     * Try clicking the AOSP lock icon to trigger the bouncer (PIN entry screen).
+     * On API 35 Pixel/AOSP, dispatchGesture swipe on the lockscreen does NOT
+     * transition to the PIN bouncer. The bouncer only appears when the lock icon
+     * is explicitly clicked.
+     *
+     * Uses two strategies:
+     * 1. findAccessibilityNodeInfosByViewId (works on some devices)
+     * 2. Manual tree traversal looking for clickable node in bottom area with
+     *    a child ImageView that has contentDescription (the lock icon pattern)
+     *    — needed on API 35 where resource-ids are hidden on the keyguard
+     *
+     * @return true if the lock icon was found and clicked
+     */
+    private fun tryClickLockIcon(): Boolean {
+        // EMUI fast path: lockscreen does not have a tappable lock icon.
+        // Skip AOSP strategies entirely — enterPin() will fall back to swipe.
+        if (Build.MANUFACTURER?.lowercase()?.contains("huawei") == true) {
+            Timber.tag(TAG).d("tryClickLockIcon: EMUI detected, skipping lock icon search")
+            return false
+        }
+
+        val windowsList = windows
+        if (windowsList.isNullOrEmpty()) {
+            Timber.tag(TAG).d("tryClickLockIcon: no windows")
+            return false
+        }
+
+        val screenHeight = resources.displayMetrics.heightPixels
+
+        for (window in windowsList) {
+            val root = window.root ?: continue
+
+            // Strategy 1: find by view ID (works on some AOSP versions)
+            val nodes = root.findAccessibilityNodeInfosByViewId(
+                "com.android.systemui:id/device_entry_icon_view"
+            )
+            if (!nodes.isNullOrEmpty()) {
+                val lockIcon = nodes[0]
+                val result = lockIcon.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                nodes.forEach { it.recycle() }
+                root.recycle()
+                Timber.tag(TAG).i("tryClickLockIcon: found by viewId, clicked result=$result")
+                return result
+            }
+
+            // Strategy 2: traverse tree for clickable node in bottom 25% of screen
+            // with a child ImageView that has contentDescription (lock icon pattern)
+            val lockNode = findLockIconByTraversal(root, screenHeight)
+            if (lockNode != null) {
+                val result = lockNode.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                Timber.tag(TAG).i("tryClickLockIcon: found by traversal, clicked result=$result")
+                lockNode.recycle()
+                root.recycle()
+                return result
+            }
+
+            root.recycle()
+        }
+        Timber.tag(TAG).d("tryClickLockIcon: lock icon not found")
+        return false
+    }
+
+    /**
+     * Find the lock icon node by traversing the tree.
+     * Looks for a clickable node in the bottom 25% of screen that contains
+     * a child ImageView with a non-null contentDescription.
+     * This matches the Pixel/AOSP lock icon pattern.
+     */
+    private fun findLockIconByTraversal(
+        node: AccessibilityNodeInfo,
+        screenHeight: Int
+    ): AccessibilityNodeInfo? {
+        val bounds = android.graphics.Rect()
+        node.getBoundsInScreen(bounds)
+
+        // Check if this is a clickable node in the bottom 25% of screen
+        if (node.isClickable && bounds.top > screenHeight * 0.75) {
+            // Check if it has a child ImageView with lock-related contentDescription.
+            // Must check for "lock" keywords to avoid false positives on Samsung One UI
+            // shortcut buttons (Camera/Phone) which also match the structural pattern.
+            for (i in 0 until node.childCount) {
+                val child = node.getChild(i) ?: continue
+                val desc = child.contentDescription?.toString()?.lowercase() ?: ""
+                val isLockIcon = child.className?.toString() == "android.widget.ImageView"
+                        && desc.isNotEmpty()
+                        && (desc.contains("lock") || desc.contains("замок") || desc.contains("блокировк"))
+                child.recycle()
+                if (isLockIcon) {
+                    Timber.tag(TAG).d("tryClickLockIcon: candidate at bounds=$bounds, desc='$desc'")
+                    return node
+                }
+            }
+        }
+
+        // Recurse into children
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i) ?: continue
+            val found = findLockIconByTraversal(child, screenHeight)
+            if (found != null) {
+                if (found !== child) child.recycle()
+                return found
+            }
+            child.recycle()
+        }
+        return null
     }
 
     /**
@@ -436,7 +601,12 @@ class TikTokAccessibilityService : AccessibilityService() {
         isFilterExpanded = true
         val info = serviceInfo
         info.packageNames = null // Allow all packages temporarily
-        info.flags = info.flags or AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS
+        // FLAG_INCLUDE_NOT_IMPORTANT_VIEWS: see MIUI keyguard buttons marked "not important"
+        // FLAG_RETRIEVE_INTERACTIVE_WINDOWS: required to access PIN pad in separate window layers.
+        // EMUI can silently drop this flag on serviceInfo round-trips, so we re-set it explicitly.
+        info.flags = info.flags or
+            AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS or
+            AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
         serviceInfo = info
         Timber.tag(TAG).i("Package filter expanded for lockscreen access")
     }
@@ -558,10 +728,13 @@ class TikTokAccessibilityService : AccessibilityService() {
             if (text == null) return null
             // Exact single digit: "5"
             if (text.length == 1 && text[0].isDigit()) return text[0]
-            // Digit prefix: "1, key" or "5 кнопка"
+            // Digit prefix: "1, key" or "5 кнопка" (AOSP/MIUI)
             if (text.isNotEmpty() && text[0].isDigit() && (text.length == 1 || !text[1].isDigit())) {
                 return text[0]
             }
+            // Digit suffix: "Button 1", "Key 0", "Digit 5" (EMUI/some OEM pattern)
+            val lastWord = text.trimEnd().substringAfterLast(' ')
+            if (lastWord.length == 1 && lastWord[0].isDigit()) return lastWord[0]
             return null
         }
 
@@ -589,6 +762,90 @@ class TikTokAccessibilityService : AccessibilityService() {
 
         findPinButtons(root)
         return coords
+    }
+
+    /**
+     * Find and tap the Enter/OK button on the PIN pad.
+     * On Pixel/AOSP, the PIN pad has an Enter key (checkmark) that must be pressed
+     * to confirm the PIN. Searches by resource ID and contentDescription.
+     */
+    private suspend fun tapEnterButton(): Boolean {
+        // Strategy 1: find by resource ID (most reliable on AOSP)
+        val windowsList = windows
+        if (windowsList.isNullOrEmpty()) return false
+
+        for (window in windowsList) {
+            val root = window.root ?: continue
+
+            // Try common resource IDs for Enter key
+            val enterIds = listOf(
+                "com.android.systemui:id/key_enter",
+                "com.android.systemui:id/key_enter_text",           // Samsung One UI
+                "com.android.systemui:id/confirm_btn",
+                "com.huawei.android.launcher:id/key_enter",         // EMUI 12
+                "com.huawei.android.launcher:id/pinpad_confirm",    // EMUI variant
+            )
+            for (enterId in enterIds) {
+                val nodes = root.findAccessibilityNodeInfosByViewId(enterId)
+                if (!nodes.isNullOrEmpty()) {
+                    val enterNode = nodes[0]
+                    val bounds = android.graphics.Rect()
+                    enterNode.getBoundsInScreen(bounds)
+                    val x = (bounds.left + bounds.right) / 2
+                    val y = (bounds.top + bounds.bottom) / 2
+                    Timber.tag(TAG).i("tapEnterButton: found by ID '$enterId' at ($x, $y)")
+                    nodes.forEach { it.recycle() }
+                    root.recycle()
+                    return tap(x, y)
+                }
+            }
+
+            // Strategy 2: traverse tree for Enter/OK by contentDescription
+            val enterNode = findEnterButtonByTraversal(root)
+            if (enterNode != null) {
+                val bounds = android.graphics.Rect()
+                enterNode.getBoundsInScreen(bounds)
+                val x = (bounds.left + bounds.right) / 2
+                val y = (bounds.top + bounds.bottom) / 2
+                Timber.tag(TAG).i("tapEnterButton: found by traversal at ($x, $y)")
+                enterNode.recycle()
+                root.recycle()
+                return tap(x, y)
+            }
+
+            root.recycle()
+        }
+
+        Timber.tag(TAG).w("tapEnterButton: Enter button not found (device may auto-submit)")
+        return false
+    }
+
+    /**
+     * Find the Enter button in the PIN pad by traversing the UI tree.
+     * Looks for nodes with contentDescription matching Enter/OK patterns.
+     */
+    private fun findEnterButtonByTraversal(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        val desc = node.contentDescription?.toString()?.lowercase()
+        if (desc != null) {
+            val isEnter = desc == "enter" || desc == "ok" || desc == "done"
+                    || desc == "ввод" || desc == "ок" || desc == "готово"
+                    || desc.contains("enter") || desc.contains("confirm")
+                    || desc.startsWith("ok,")  // Samsung One UI: "OK, Button, Disabled"
+            if (isEnter) {
+                return AccessibilityNodeInfo.obtain(node)
+            }
+        }
+
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i) ?: continue
+            val found = findEnterButtonByTraversal(child)
+            if (found != null) {
+                child.recycle()
+                return found
+            }
+            child.recycle()
+        }
+        return null
     }
 
     private fun dumpNodeTree(node: AccessibilityNodeInfo, depth: Int) {
@@ -642,6 +899,22 @@ class TikTokAccessibilityService : AccessibilityService() {
 
     override fun onInterrupt() {
         Timber.tag(TAG).w("Accessibility Service interrupted")
+    }
+
+    /**
+     * Return true so Android calls onRebind() instead of onBind() on reconnection.
+     * This helps the system rebind faster after transient process deaths,
+     * reducing the chance of entering the "crashed services" state.
+     */
+    override fun onUnbind(intent: Intent?): Boolean {
+        Timber.tag(TAG).w("Accessibility Service onUnbind — requesting rebind")
+        return true
+    }
+
+    override fun onRebind(intent: Intent?) {
+        super.onRebind(intent)
+        instance = this
+        Timber.tag(TAG).i("Accessibility Service rebound (fast path via onRebind)")
     }
 
     override fun onDestroy() {
@@ -834,50 +1107,60 @@ class TikTokAccessibilityService : AccessibilityService() {
     }
 
     /**
-     * Take a screenshot (requires API 30+)
+     * Take a screenshot.
+     * - API 30+: Native AccessibilityService.takeScreenshot()
+     * - API 29: MediaProjection fallback (VirtualDisplay + ImageReader)
+     * - API 28-: Not supported
      */
     suspend fun takeScreenshot(): Bitmap? {
         Timber.tag(TAG).d("takeScreenshot called, SDK=${Build.VERSION.SDK_INT}")
 
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
-            Timber.tag(TAG).w("Screenshot requires API 30+")
-            return null
-        }
+        // API 30+: Use native AccessibilityService.takeScreenshot()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            Timber.tag(TAG).d("Starting screenshot capture via AccessibilityService...")
+            val result = withTimeoutOrNull(5000) {
+                suspendCancellableCoroutine { continuation ->
+                    takeScreenshot(
+                        Display.DEFAULT_DISPLAY,
+                        mainExecutor,
+                        object : TakeScreenshotCallback {
+                            override fun onSuccess(screenshot: ScreenshotResult) {
+                                Timber.tag(TAG).d("Screenshot onSuccess!")
+                                val bitmap = Bitmap.wrapHardwareBuffer(
+                                    screenshot.hardwareBuffer,
+                                    screenshot.colorSpace
+                                )
+                                screenshot.hardwareBuffer.close()
+                                continuation.resume(bitmap)
+                            }
 
-        Timber.tag(TAG).d("Starting screenshot capture...")
-        val result = withTimeoutOrNull(5000) {
-            suspendCancellableCoroutine { continuation ->
-                Timber.tag(TAG).d("Calling takeScreenshot API...")
-                takeScreenshot(
-                    Display.DEFAULT_DISPLAY,
-                    mainExecutor,
-                    object : TakeScreenshotCallback {
-                        override fun onSuccess(screenshot: ScreenshotResult) {
-                            Timber.tag(TAG).d("Screenshot onSuccess!")
-                            val bitmap = Bitmap.wrapHardwareBuffer(
-                                screenshot.hardwareBuffer,
-                                screenshot.colorSpace
-                            )
-                            screenshot.hardwareBuffer.close()
-                            continuation.resume(bitmap)
+                            override fun onFailure(errorCode: Int) {
+                                Timber.tag(TAG).e("Screenshot onFailure! error code: $errorCode")
+                                continuation.resume(null)
+                            }
                         }
-
-                        override fun onFailure(errorCode: Int) {
-                            Timber.tag(TAG).e("Screenshot onFailure! error code: $errorCode")
-                            continuation.resume(null)
-                        }
-                    }
-                )
+                    )
+                }
             }
+
+            if (result == null) {
+                Timber.tag(TAG).e("Screenshot returned null (timeout or failure)")
+            } else {
+                Timber.tag(TAG).d("Screenshot successful: ${result.width}x${result.height}")
+            }
+
+            return result
         }
 
-        if (result == null) {
-            Timber.tag(TAG).e("Screenshot returned null (timeout or failure)")
-        } else {
-            Timber.tag(TAG).d("Screenshot successful: ${result.width}x${result.height}")
+        // API 29: Fallback to MediaProjection
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            Timber.tag(TAG).d("Using MediaProjection fallback for API ${Build.VERSION.SDK_INT}")
+            return MediaProjectionScreenshot.capture(applicationContext)
         }
 
-        return result
+        // API 28-: Not supported
+        Timber.tag(TAG).w("Screenshot not supported on API ${Build.VERSION.SDK_INT}")
+        return null
     }
 
     /**

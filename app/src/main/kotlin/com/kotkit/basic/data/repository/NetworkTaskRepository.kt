@@ -1,6 +1,6 @@
 package com.kotkit.basic.data.repository
 
-import android.util.Log
+import timber.log.Timber
 import com.kotkit.basic.data.local.db.NetworkTaskDao
 import com.kotkit.basic.data.local.db.entities.NetworkTaskEntity
 import com.kotkit.basic.data.local.db.entities.NetworkTaskStatus
@@ -71,10 +71,10 @@ class NetworkTaskRepository @Inject constructor(
     suspend fun fetchAvailableTasks(limit: Int = 10, categoryId: String? = null): Result<List<TaskResponse>> {
         return try {
             val response = apiService.getAvailableTasks(limit, categoryId)
-            Log.i(TAG, "Fetched ${response.tasks.size} available tasks")
+            Timber.tag(TAG).i("Fetched ${response.tasks.size} available tasks")
             Result.success(response.tasks)
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to fetch available tasks", e)
+            Timber.tag(TAG).e(e, "Failed to fetch available tasks")
             Result.failure(e)
         }
     }
@@ -88,10 +88,10 @@ class NetworkTaskRepository @Inject constructor(
             val response = apiService.claimTask(taskId)
             val entity = response.toEntity()
             networkTaskDao.insert(entity)
-            Log.i(TAG, "Claimed task $taskId, scheduled for ${entity.scheduledFor}")
+            Timber.tag(TAG).i("Claimed task $taskId, scheduled for ${entity.scheduledFor}")
             Result.success(entity)
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to claim task $taskId", e)
+            Timber.tag(TAG).e(e, "Failed to claim task $taskId")
             Result.failure(e)
         }
     }
@@ -112,10 +112,10 @@ class NetworkTaskRepository @Inject constructor(
             val response = apiService.acceptTask(taskId)
             val entity = response.toEntity()
             networkTaskDao.insert(entity)
-            Log.i(TAG, "Accepted reserved task $taskId, scheduled for ${entity.scheduledFor}")
+            Timber.tag(TAG).i("Accepted reserved task $taskId, scheduled for ${entity.scheduledFor}")
             Result.success(entity)
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to accept task $taskId", e)
+            Timber.tag(TAG).e(e, "Failed to accept task $taskId")
             Result.failure(e)
         }
     }
@@ -126,10 +126,10 @@ class NetworkTaskRepository @Inject constructor(
     suspend fun getReservedTasks(): Result<List<TaskResponse>> {
         return try {
             val response = apiService.getReservedTasks()
-            Log.i(TAG, "Got ${response.tasks.size} reserved tasks")
+            Timber.tag(TAG).i("Got ${response.tasks.size} reserved tasks")
             Result.success(response.tasks)
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to get reserved tasks", e)
+            Timber.tag(TAG).e(e, "Failed to get reserved tasks")
             Result.failure(e)
         }
     }
@@ -142,10 +142,10 @@ class NetworkTaskRepository @Inject constructor(
         return try {
             val response = apiService.sendHeartbeat(taskId)
             networkTaskDao.updateHeartbeat(taskId, response.lastHeartbeat)
-            Log.d(TAG, "Heartbeat sent for task $taskId")
+            Timber.tag(TAG).d("Heartbeat sent for task $taskId")
             Result.success(Unit)
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to send heartbeat for $taskId", e)
+            Timber.tag(TAG).e(e, "Failed to send heartbeat for $taskId")
             // Mark for retry
             networkTaskDao.updateSyncStatus(taskId, SyncStatus.PENDING_HEARTBEAT)
             Result.failure(e)
@@ -159,7 +159,7 @@ class NetworkTaskRepository @Inject constructor(
     suspend fun getVideoUrl(taskId: String): Result<VideoDownloadInfo> {
         return try {
             val response = apiService.getVideoUrl(taskId)
-            Log.i(TAG, "Got video URL for task $taskId, size=${response.videoSizeBytes}")
+            Timber.tag(TAG).i("Got video URL for task $taskId, size=${response.videoSizeBytes}")
             Result.success(VideoDownloadInfo(
                 url = response.videoUrl,
                 hash = response.videoHash,
@@ -168,7 +168,7 @@ class NetworkTaskRepository @Inject constructor(
                 supportsResume = response.supportResume
             ))
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to get video URL for $taskId", e)
+            Timber.tag(TAG).e(e, "Failed to get video URL for $taskId")
             Result.failure(e)
         }
     }
@@ -189,10 +189,10 @@ class NetworkTaskRepository @Inject constructor(
                 TaskProgressRequest(status, progressPercent, message)
             )
             networkTaskDao.updateStatus(taskId, status)
-            Log.d(TAG, "Updated progress: $taskId -> $status ($progressPercent%)")
+            Timber.tag(TAG).d("Updated progress: $taskId -> $status ($progressPercent%)")
             Result.success(Unit)
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to update progress for $taskId", e)
+            Timber.tag(TAG).e(e, "Failed to update progress for $taskId")
             // Still update local status for offline support
             networkTaskDao.updateStatus(taskId, status)
             Result.failure(e)
@@ -213,7 +213,7 @@ class NetworkTaskRepository @Inject constructor(
 
     suspend fun completeTask(
         taskId: String,
-        tiktokVideoId: String,
+        tiktokVideoId: String?,
         tiktokPostUrl: String?,
         proofScreenshotPath: String?,
         proofScreenshotB64: String?
@@ -237,10 +237,10 @@ class NetworkTaskRepository @Inject constructor(
                 )
             )
             networkTaskDao.updateSyncStatus(taskId, SyncStatus.SYNCED)
-            Log.i(TAG, "Task $taskId completed and synced")
+            Timber.tag(TAG).i("Task $taskId completed and synced")
             Result.success(Unit)
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to sync completion for $taskId (will retry)", e)
+            Timber.tag(TAG).e(e, "Failed to sync completion for $taskId (will retry)")
             // Keep pending sync status for later retry
             Result.failure(e)
         }
@@ -275,11 +275,18 @@ class NetworkTaskRepository @Inject constructor(
                 )
             )
             networkTaskDao.updateSyncStatus(taskId, SyncStatus.SYNCED)
-            Log.i(TAG, "Task $taskId failed and synced: $errorMessage")
+            Timber.tag(TAG).i("Task $taskId failed and synced: $errorMessage")
             Result.success(Unit)
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to sync failure for $taskId (will retry)", e)
-            Result.failure(e)
+            // If server returns 403/404, the task was reassigned — no point retrying.
+            if (e is retrofit2.HttpException && e.code() in listOf(403, 404)) {
+                Timber.tag(TAG).w("Task $taskId rejected by server (${e.code()}) on fail, removing ghost task")
+                removeStaleTask(taskId)
+                Result.success(Unit)
+            } else {
+                Timber.tag(TAG).e(e, "Failed to sync failure for $taskId (will retry)")
+                Result.failure(e)
+            }
         }
     }
 
@@ -325,12 +332,19 @@ class NetworkTaskRepository @Inject constructor(
                     }
                 }
             } catch (e: Exception) {
-                Log.w(TAG, "Failed to sync task ${task.id}: ${e.message}")
+                // If server returns 403/404, the task was reassigned or doesn't exist.
+                // Stop retrying — remove from local DB to prevent infinite 403 loop.
+                if (e is retrofit2.HttpException && e.code() in listOf(403, 404)) {
+                    Timber.tag(TAG).w("Task ${task.id} rejected by server (${e.code()}) during sync, removing ghost task")
+                    removeStaleTask(task.id)
+                } else {
+                    Timber.tag(TAG).w("Failed to sync task ${task.id}: ${e.message}")
+                }
             }
         }
 
         if (synced > 0) {
-            Log.i(TAG, "Synced $synced pending tasks")
+            Timber.tag(TAG).i("Synced $synced pending tasks")
         }
         return synced
     }
@@ -346,9 +360,9 @@ class NetworkTaskRepository @Inject constructor(
     suspend fun removeStaleTask(taskId: String) {
         try {
             networkTaskDao.deleteById(taskId)
-            Log.i(TAG, "Removed stale task $taskId from local DB")
+            Timber.tag(TAG).i("Removed stale task $taskId from local DB")
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to remove stale task $taskId", e)
+            Timber.tag(TAG).w(e, "Failed to remove stale task $taskId")
         }
     }
 
@@ -362,10 +376,10 @@ class NetworkTaskRepository @Inject constructor(
             try {
                 val file = File(path)
                 if (file.exists() && file.delete()) {
-                    Log.i(TAG, "Deleted video file for task $taskId")
+                    Timber.tag(TAG).i("Deleted video file for task $taskId")
                 }
             } catch (e: Exception) {
-                Log.w(TAG, "Failed to delete video file: $path", e)
+                Timber.tag(TAG).w(e, "Failed to delete video file: $path")
             }
             Unit
         }
@@ -375,7 +389,7 @@ class NetworkTaskRepository @Inject constructor(
     suspend fun cleanupOldTasks(daysOld: Int = 7) {
         val cutoff = System.currentTimeMillis() - (daysOld * 24 * 60 * 60 * 1000L)
         networkTaskDao.deleteOldCompletedTasks(cutoff)
-        Log.i(TAG, "Cleaned up tasks older than $daysOld days")
+        Timber.tag(TAG).i("Cleaned up tasks older than $daysOld days")
     }
 
     // ========================================================================
@@ -403,13 +417,12 @@ class NetworkTaskRepository @Inject constructor(
             priceRub = priceRub,
             assignedAt = assignedAt?.toMillisIfSeconds(),
             scheduledFor = scheduledFor?.toMillisIfSeconds(),
-            lastHeartbeat = lastHeartbeat,
+            lastHeartbeat = null,
             startedAt = startedAt?.toMillisIfSeconds(),
             completedAt = completedAt?.toMillisIfSeconds(),
             tiktokVideoId = tiktokVideoId,
             tiktokPostUrl = tiktokPostUrl,
             errorMessage = errorMessage,
-            errorType = errorType,
             retryCount = retryCount,
             videoThumbnailUrl = videoThumbnailUrl,
             syncStatus = SyncStatus.SYNCED
@@ -428,7 +441,7 @@ class NetworkTaskRepository @Inject constructor(
             val response = apiService.getCompletedTasksWithVerification(limit, offset)
             Result.success(response)
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to fetch completed tasks with verification", e)
+            Timber.tag(TAG).e(e, "Failed to fetch completed tasks with verification")
             Result.failure(e)
         }
     }
@@ -444,7 +457,7 @@ class NetworkTaskRepository @Inject constructor(
             )
             Result.success(response)
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to submit verification URL", e)
+            Timber.tag(TAG).e(e, "Failed to submit verification URL")
             Result.failure(e)
         }
     }

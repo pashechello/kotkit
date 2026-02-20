@@ -1,6 +1,6 @@
 package com.kotkit.basic.data.repository
 
-import android.util.Log
+import timber.log.Timber
 import com.kotkit.basic.data.remote.api.ApiService
 import com.kotkit.basic.data.remote.api.models.AnalyticsEvent
 import com.kotkit.basic.data.remote.api.models.EventType
@@ -104,13 +104,13 @@ class AnalyticsRepository @Inject constructor(
                 )
                 val response = apiService.trackEvent(event)
                 if (response.success) {
-                    Log.d(TAG, "Event tracked: $eventType for post $postId")
+                    Timber.tag(TAG).d("Event tracked: $eventType for post $postId")
                 } else {
-                    Log.w(TAG, "Event tracking returned success=false: $eventType")
+                    Timber.tag(TAG).w("Event tracking returned success=false: $eventType")
                 }
             } catch (e: Exception) {
                 // Don't fail the main flow - just log
-                Log.w(TAG, "Failed to track event: $eventType", e)
+                Timber.tag(TAG).w(e, "Failed to track event: $eventType")
             }
         }
     }

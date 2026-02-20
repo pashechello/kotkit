@@ -1,7 +1,7 @@
 package com.kotkit.basic.ui.screens.splash
 
 import android.net.Uri
-import android.util.Log
+import timber.log.Timber
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.widget.FrameLayout
 import androidx.annotation.OptIn
@@ -79,16 +79,16 @@ fun SplashScreen(
     )
 
     val titleScale by animateFloatAsState(
-        targetValue = if (showTitle && !glitchActive) 1f else 0.8f,
+        targetValue = if (showTitle && !glitchActive) 1f else 0.3f,
         animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow
+            dampingRatio = 0.5f, // More bounce
+            stiffness = Spring.StiffnessMedium
         ),
         label = "titleScale"
     )
 
     val titleOffsetY by animateFloatAsState(
-        targetValue = if (showTitle && !glitchActive) 0f else 30f,
+        targetValue = if (showTitle && !glitchActive) 0f else 10f,
         animationSpec = tween(800, easing = FastOutSlowInEasing),
         label = "titleOffsetY"
     )
