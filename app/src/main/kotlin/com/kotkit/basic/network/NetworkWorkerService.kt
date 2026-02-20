@@ -176,18 +176,21 @@ class NetworkWorkerService : Service() {
         // Call startForeground immediately — before any async work — to satisfy the 5s ANR deadline.
         // EMUI and other OEMs may slow down the first DB query enough to miss the deadline.
         // Notification shows zero counts initially; updated asynchronously below.
-        // On API 29: include mediaProjection type so MediaProjection fallback can create VirtualDisplays.
         val notification = createNotification(activeTasksCount = 0, todayEarnings = 0f, completedToday = 0)
-        if (Build.VERSION.SDK_INT == Build.VERSION_CODES.Q && MediaProjectionScreenshot.isAvailable) {
-            startForeground(
-                NOTIFICATION_ID,
-                notification,
-                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION or
-                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
-            )
+
+        // Determine foreground service type explicitly.
+        // On API 29: include mediaProjection type (if consent granted) for VirtualDisplay screenshot fallback.
+        // On API 30+: only dataSync — screenshots use AccessibilityService.takeScreenshot().
+        // CRITICAL: Never call startForeground() without an explicit type when the manifest declares
+        // mediaProjection — Android 14+ infers ALL manifest types, triggering SecurityException
+        // if mediaProjection consent hasn't been obtained.
+        val fgsType = if (Build.VERSION.SDK_INT == Build.VERSION_CODES.Q && MediaProjectionScreenshot.isAvailable) {
+            android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION or
+                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
         } else {
-            startForeground(NOTIFICATION_ID, notification)
+            android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
         }
+        startForeground(NOTIFICATION_ID, notification, fgsType)
 
         // Update notification with real data asynchronously
         serviceScope.launch {

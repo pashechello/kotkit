@@ -366,30 +366,32 @@ class TikTokAccessibilityService : AccessibilityService() {
                 kotlinx.coroutines.delay(500)
             }
 
-            // 3. Bring lockscreen to foreground if our app is active
-            // On MIUI, our app may render above the keyguard after screen wake.
-            // HOME press surfaces the lockscreen so swipe targets the correct layer.
-            // On EMUI 12, the keyguard is owned by com.huawei.android.launcher (not com.android.systemui).
-            val activeRoot = rootInActiveWindow?.packageName?.toString()
-            val isAlreadyOnLockscreen = activeRoot == null || activeRoot in LOCKSCREEN_PACKAGES
-            if (!isAlreadyOnLockscreen) {
-                Timber.tag(TAG).i("enterPin: active window is $activeRoot, pressing HOME to surface keyguard")
-                performGlobalAction(GLOBAL_ACTION_HOME)
-                kotlinx.coroutines.delay(500)
-            }
-
             val screenWidth = resources.displayMetrics.widthPixels
             val screenHeight = resources.displayMetrics.heightPixels
             val swipeX = screenWidth / 2
             val swipeStartY = (screenHeight * 0.9f).toInt()
             val swipeEndY = (screenHeight * 0.4f).toInt()
 
-            // 4. Swipe up + poll for PIN pad (with retry)
+            // 3. Swipe up + poll for PIN pad (with retry)
+            // Each attempt checks active window and presses HOME if our app is above keyguard.
+            // This prevents the race condition where rootInActiveWindow changes between
+            // the initial check and the swipe (MIUI can bring our app to foreground mid-flow).
             var initialCoords: Map<Char, Pair<Int, Int>>? = null
             val maxSwipeAttempts = 2
             for (attempt in 1..maxSwipeAttempts) {
                 val currentRoot = rootInActiveWindow?.packageName?.toString()
                 Timber.tag(TAG).i("enterPin: attempt $attempt/$maxSwipeAttempts (activeRoot=$currentRoot)")
+
+                // Ensure lockscreen is in foreground before swiping.
+                // On MIUI, our app may render above the keyguard after screen wake.
+                // HOME press surfaces the lockscreen so swipe targets the correct layer.
+                // On EMUI 12, the keyguard is owned by com.huawei.android.launcher.
+                val onLockscreen = currentRoot == null || currentRoot in LOCKSCREEN_PACKAGES
+                if (!onLockscreen) {
+                    Timber.tag(TAG).i("enterPin: not on lockscreen ($currentRoot), pressing HOME to surface keyguard")
+                    performGlobalAction(GLOBAL_ACTION_HOME)
+                    kotlinx.coroutines.delay(500)
+                }
 
                 // Try lock icon first (Pixel/AOSP fast path)
                 val clickedLockIcon = tryClickLockIcon()
@@ -411,9 +413,7 @@ class TikTokAccessibilityService : AccessibilityService() {
                 if (initialCoords != null) break
 
                 if (attempt < maxSwipeAttempts) {
-                    Timber.tag(TAG).w("enterPin: PIN pad not found on attempt $attempt, pressing HOME and retrying...")
-                    performGlobalAction(GLOBAL_ACTION_HOME)
-                    kotlinx.coroutines.delay(500)
+                    Timber.tag(TAG).w("enterPin: PIN pad not found on attempt $attempt, retrying...")
                 }
             }
 
