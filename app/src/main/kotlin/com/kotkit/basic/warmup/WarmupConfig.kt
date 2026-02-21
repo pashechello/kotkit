@@ -37,9 +37,14 @@ object WarmupConfig {
     const val SWIPE_DURATION_MAX_MS = 450L
     const val POST_SWIPE_SETTLE_MS = 600L       // Wait for video transition
 
-    // Stuck detection & VLM recovery
-    const val FEED_CHECK_INTERVAL = 5           // Check every N videos
-    const val STUCK_THRESHOLD = 2               // VLM recovery after N unchanged screens
+    // VLM monitoring (verify_feed + analyze recovery)
+    const val VLM_CHECK_INTERVAL_VIDEOS = 3     // Check feed state via Qwen every N videos
+    const val MAX_VLM_RECOVERY_ATTEMPTS = 3     // Max full VLM recovery attempts per session
+    const val MAX_POPUP_DISMISSALS = 5          // Max popup dismissals before aborting
+    const val FEED_RECOVERY_SETTLE_MS = 1500L   // Wait after VLM recovery action
+
+    // Periodic device checks
+    const val FEED_CHECK_INTERVAL = 5           // Check TikTok foreground + charging every N videos
 
     // TikTok launch
     const val TIKTOK_LAUNCH_WAIT_MS = 5000L

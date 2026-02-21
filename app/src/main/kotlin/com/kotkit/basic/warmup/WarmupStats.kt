@@ -4,7 +4,8 @@ data class WarmupStats(
     val videosWatched: Int = 0,
     val likesGiven: Int = 0,
     val durationSeconds: Int = 0,
-    val vlmRecoveryCalls: Int = 0
+    val vlmRecoveryCalls: Int = 0,
+    val popupsDismissed: Int = 0
 )
 
 sealed class WarmupResult {
