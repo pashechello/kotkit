@@ -322,7 +322,10 @@ class NetworkWorkerService : Service() {
                             try {
                                 val acceptResult = networkTaskRepository.acceptTask(taskId)
                                 if (acceptResult.isSuccess) {
-                                    Timber.tag(TAG).i("Crash recovery: accepted task $taskId")
+                                    val entity = acceptResult.getOrThrow()
+                                    Timber.tag(TAG).i("Crash recovery: accepted task $taskId, scheduling execution")
+                                    // Schedule execution via WorkManager (like TaskAcceptWorker does)
+                                    TaskAcceptWorker.scheduleTaskExecution(workManager, taskId, entity.scheduledFor)
                                 } else {
                                     Timber.tag(TAG).w("Crash recovery: failed to accept $taskId: ${acceptResult.exceptionOrNull()?.message}")
                                 }
@@ -348,20 +351,37 @@ class NetworkWorkerService : Service() {
      * Crash recovery: fail tasks that were stuck mid-execution when app process was killed.
      *
      * If MIUI kills the process during task execution, WorkManager loses the job
-     * and the task stays in assigned/downloading/posting locally but never completes.
+     * and the task stays in downloading/posting locally but never completes.
      * This proactively reports failure so the server can reassign immediately
      * instead of waiting 15-20 min for zombie detection.
+     *
+     * IMPORTANT: Only fail tasks in mid-execution states (downloading/posting).
+     * Tasks in 'assigned' status are just queued — WorkManager will handle them.
+     * Also delay recovery to let WorkManager re-schedule its own workers first.
      */
     private fun recoverAbandonedTasks() {
         serviceScope.launch(Dispatchers.IO) {
+            // Wait for WorkManager to restore its own workers after process restart.
+            // Without this delay, we'd fail tasks that WorkManager is about to resume.
+            delay(10_000)
+
             try {
                 val activeTasks = networkTaskRepository.getActiveTasks()
                 if (activeTasks.isEmpty()) return@launch
 
+                var failedCount = 0
                 for (task in activeTasks) {
                     // Don't fail tasks that are currently being executed by this service instance
                     if (task.id == currentlyExecutingTaskId) continue
 
+                    // Don't fail tasks in 'assigned' status — they're just queued,
+                    // WorkManager will pick them up via NetworkTaskWorker
+                    if (task.status == "assigned") {
+                        Timber.tag(TAG).d("Crash recovery: task ${task.id} is assigned (queued), skipping")
+                        continue
+                    }
+
+                    // Only fail tasks stuck in mid-execution (downloading, posting)
                     Timber.tag(TAG).w("Crash recovery: found abandoned task ${task.id} in status ${task.status}")
                     networkTaskRepository.failTask(
                         taskId = task.id,
@@ -369,10 +389,11 @@ class NetworkWorkerService : Service() {
                         errorType = "app_crash",
                         screenshotB64 = null
                     )
+                    failedCount++
                 }
 
-                if (activeTasks.isNotEmpty()) {
-                    Timber.tag(TAG).i("Crash recovery: reported ${activeTasks.size} abandoned tasks as failed")
+                if (failedCount > 0) {
+                    Timber.tag(TAG).i("Crash recovery: reported $failedCount abandoned tasks as failed (${activeTasks.size - failedCount} skipped)")
                 }
             } catch (e: Exception) {
                 Timber.tag(TAG).e(e, "Crash recovery: error cleaning abandoned tasks")

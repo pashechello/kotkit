@@ -24,6 +24,7 @@ import com.kotkit.basic.sound.SoundType
 import com.kotkit.basic.ui.MainActivity
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.random.Random
 
 /**
@@ -31,6 +32,10 @@ import kotlin.random.Random
  *
  * Scheduled by NetworkWorkerService when a task is ready to execute
  * (after cooldown period).
+ *
+ * IMPORTANT: Only one task can execute at a time (global lock via [isExecuting]).
+ * Multiple tasks may be enqueued via FCM simultaneously, but concurrent execution
+ * causes tasks to fight for the screen (PIN unlock, TikTok posting).
  */
 @HiltWorker
 class NetworkTaskWorker @AssistedInject constructor(
@@ -48,6 +53,14 @@ class NetworkTaskWorker @AssistedInject constructor(
         private const val NOTIFICATION_ID = 20001
         private const val MIN_COOLDOWN_MINUTES = 30
         const val KEY_TASK_ID = "task_id"
+
+        /**
+         * Global lock preventing concurrent task execution.
+         * When multiple NetworkTaskWorker instances run in parallel
+         * (each with unique work name "network_task_$taskId"),
+         * only one can proceed — others return Result.retry().
+         */
+        private val isExecuting = AtomicBoolean(false)
     }
 
     override suspend fun doWork(): Result {
@@ -98,6 +111,24 @@ class NetworkTaskWorker @AssistedInject constructor(
                 return Result.retry()
             }
         }
+
+        // Global execution lock: only one task can execute at a time.
+        // Multiple tasks may be enqueued simultaneously via FCM, but concurrent
+        // execution causes them to fight for the screen (PIN, TikTok posting).
+        if (!isExecuting.compareAndSet(false, true)) {
+            Timber.tag(TAG).i("Task $taskId: another task is currently executing, will retry later")
+            return Result.retry()
+        }
+
+        try {
+            return executeTaskWithLock(taskId, task)
+        } finally {
+            isExecuting.set(false)
+        }
+    }
+
+    private suspend fun executeTaskWithLock(taskId: String, task: com.kotkit.basic.data.local.db.entities.NetworkTaskEntity): Result {
+        Timber.tag(TAG).i("Task $taskId: acquired execution lock, proceeding")
 
         // Show foreground notification
         try {

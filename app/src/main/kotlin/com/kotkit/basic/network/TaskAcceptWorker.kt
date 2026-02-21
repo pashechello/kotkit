@@ -88,31 +88,7 @@ class TaskAcceptWorker @AssistedInject constructor(
     }
 
     private fun scheduleExecution(taskId: String, scheduledFor: Long?) {
-        val constraints = Constraints.Builder()
-            .setRequiredNetworkType(NetworkType.CONNECTED)
-            .build()
-
-        val data = Data.Builder()
-            .putString(NetworkTaskWorker.KEY_TASK_ID, taskId)
-            .build()
-
-        val requestBuilder = OneTimeWorkRequestBuilder<NetworkTaskWorker>()
-            .setConstraints(constraints)
-            .setInputData(data)
-
-        // Respect scheduled posting time from behavior profile
-        if (scheduledFor != null && scheduledFor > System.currentTimeMillis()) {
-            val delayMs = scheduledFor - System.currentTimeMillis()
-            requestBuilder.setInitialDelay(delayMs, TimeUnit.MILLISECONDS)
-            Timber.tag(TAG).i("Task $taskId delayed by ${delayMs / 1000 / 60}min (scheduledFor=$scheduledFor)")
-        }
-
-        workManager.enqueueUniqueWork(
-            "network_task_$taskId",
-            ExistingWorkPolicy.KEEP,
-            requestBuilder.build()
-        )
-        Timber.tag(TAG).i("Scheduled execution for task $taskId")
+        scheduleTaskExecution(workManager, taskId, scheduledFor)
     }
 
     companion object {
@@ -120,6 +96,38 @@ class TaskAcceptWorker @AssistedInject constructor(
         private const val MAX_RETRIES = 3
         const val KEY_TASK_ID = "task_id"
         const val KEY_EXPIRES_AT = "expires_at"
+
+        /**
+         * Schedule a NetworkTaskWorker for execution via WorkManager.
+         * Shared between TaskAcceptWorker and NetworkWorkerService crash recovery.
+         */
+        fun scheduleTaskExecution(workManager: WorkManager, taskId: String, scheduledFor: Long?) {
+            val constraints = Constraints.Builder()
+                .setRequiredNetworkType(NetworkType.CONNECTED)
+                .build()
+
+            val data = Data.Builder()
+                .putString(NetworkTaskWorker.KEY_TASK_ID, taskId)
+                .build()
+
+            val requestBuilder = OneTimeWorkRequestBuilder<NetworkTaskWorker>()
+                .setConstraints(constraints)
+                .setInputData(data)
+
+            // Respect scheduled posting time from behavior profile
+            if (scheduledFor != null && scheduledFor > System.currentTimeMillis()) {
+                val delayMs = scheduledFor - System.currentTimeMillis()
+                requestBuilder.setInitialDelay(delayMs, TimeUnit.MILLISECONDS)
+                Timber.tag(TAG).i("Task $taskId delayed by ${delayMs / 1000 / 60}min (scheduledFor=$scheduledFor)")
+            }
+
+            workManager.enqueueUniqueWork(
+                "network_task_$taskId",
+                ExistingWorkPolicy.KEEP,
+                requestBuilder.build()
+            )
+            Timber.tag(TAG).i("Scheduled execution for task $taskId")
+        }
 
         /**
          * Enqueue accept work for a reserved task.

@@ -57,7 +57,7 @@ class ActionExecutor @Inject constructor(
             ActionType.NAVIGATE_TO_FEED -> executeNavigateToFeed(service)
             ActionType.FINISH, ActionType.DONE -> ExecutionResult.Done(action.message)
             ActionType.ERROR -> ExecutionResult.Error(action.message, action.recoverable ?: false)
-            else -> ExecutionResult.Error("Unknown action: ${action.action}", recoverable = false)
+            else -> ExecutionResult.Error("Unknown action: ${action.action}", recoverable = true)
         }
 
         // Check cancellation after action
