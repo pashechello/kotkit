@@ -24,7 +24,11 @@ import com.kotkit.basic.data.repository.NetworkTaskRepository
 import com.kotkit.basic.data.repository.WorkerRepository
 import com.kotkit.basic.executor.accessibility.TikTokAccessibilityService
 import com.kotkit.basic.executor.screenshot.MediaProjectionScreenshot
+import com.kotkit.basic.scheduler.DeviceStateChecker
 import com.kotkit.basic.ui.components.SnackbarController
+import com.kotkit.basic.warmup.WarmupAgent
+import com.kotkit.basic.warmup.WarmupScheduler
+import com.kotkit.basic.warmup.WarmupWorker
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -119,6 +123,8 @@ class NetworkWorkerService : Service() {
     @Inject lateinit var workManager: WorkManager
     @Inject lateinit var fcmTokenManager: com.kotkit.basic.fcm.FCMTokenManager
     @Inject lateinit var logUploader: LogUploader
+    @Inject lateinit var warmupScheduler: WarmupScheduler
+    @Inject lateinit var warmupAgent: WarmupAgent
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var pollingJob: Job? = null
@@ -267,6 +273,9 @@ class NetworkWorkerService : Service() {
 
         // Cancel log upload worker
         LogUploadWorker.cancel(workManager)
+
+        // Cancel warmup if running
+        cancelWarmup()
 
         // Stop polling
         pollingJob?.cancel()
@@ -477,7 +486,19 @@ class NetworkWorkerService : Service() {
                 maxDaily = maxDailyPosts,
                 nextPollSeconds = (POLL_INTERVAL_MS / 1000).toInt()
             )
+
+            // Check if warmup should run (charging + screen off + frequency limits)
+            if (warmupScheduler.shouldStartWarmup()) {
+                enqueueWarmupWorker()
+            }
+
             return
+        }
+
+        // Cancel warmup if running — posting task takes priority
+        if (warmupScheduler.isWarmupRunning) {
+            Timber.tag(TAG).i("Task found, cancelling warmup")
+            cancelWarmup()
         }
 
         Timber.tag(TAG).i("Found task ready for execution: ${task.id}")
@@ -560,6 +581,26 @@ class NetworkWorkerService : Service() {
         } catch (e: Exception) {
             0f
         }
+    }
+
+    // ========================================================================
+    // Warmup
+    // ========================================================================
+
+    private fun enqueueWarmupWorker() {
+        warmupScheduler.isWarmupRunning = true // Set BEFORE enqueue to prevent duplicate enqueue on next poll
+        Timber.tag(TAG).i("Enqueuing warmup worker")
+        val request = OneTimeWorkRequestBuilder<WarmupWorker>().build()
+        workManager.enqueueUniqueWork(
+            WarmupWorker.UNIQUE_WORK_NAME,
+            ExistingWorkPolicy.KEEP,
+            request
+        )
+    }
+
+    private fun cancelWarmup() {
+        warmupAgent.cancel()
+        workManager.cancelUniqueWork(WarmupWorker.UNIQUE_WORK_NAME)
     }
 
     private fun createNotification(
