@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <receiver
+            android:name="com.kotkit.basic.debug.DebugAudioTestReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.kotkit.basic.DEBUG_MUTE" />
+                <action android:name="com.kotkit.basic.DEBUG_RESTORE" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>
