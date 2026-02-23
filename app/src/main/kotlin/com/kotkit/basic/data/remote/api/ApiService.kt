@@ -207,7 +207,7 @@ interface ApiService {
     @POST("api/v1/proxy/sessions/{session_id}/disconnect")
     suspend fun reportProxyDisconnect(
         @Path("session_id") sessionId: String,
-        @Body request: ProxyConnectRequest
+        @Body request: ProxyDisconnectRequest
     ): ProxyEventResponse
 
     // ========================================================================

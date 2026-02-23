@@ -64,6 +64,16 @@ class VpnConsentActivity : Activity() {
         }
     }
 
+    override fun onDestroy() {
+        // Null out the static callback to prevent memory leaks if the Activity is
+        // destroyed before onActivityResult fires (e.g. process kill during the dialog).
+        if (onConsentResult != null) {
+            Timber.tag(TAG).w("VpnConsentActivity destroyed before result — clearing callback")
+            onConsentResult = null
+        }
+        super.onDestroy()
+    }
+
     @Deprecated("Using deprecated onActivityResult for minSdk 26 compat")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         @Suppress("DEPRECATION")

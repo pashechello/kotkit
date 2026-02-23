@@ -17,6 +17,7 @@
     <string name="notification_channel_posting">Статус публикации</string>
     <string name="notification_channel_alerts">Уведомления о постах</string>
     <string name="notification_channel_scheduled">Запланированные посты</string>
+    <string name="notification_channel_vpn">VPN прокси</string>
 
     <!-- Worker Mode Notifications -->
     <string name="worker_notif_executing">🚀 Выполняется задача…</string>

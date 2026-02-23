@@ -38,6 +38,13 @@ data class ProxyConnectRequest(
     @SerializedName("exit_ip")    val exitIp: String?
 )
 
+/** Separate model for disconnect events — semantically distinct from connect. */
+data class ProxyDisconnectRequest(
+    @SerializedName("task_id")    val taskId: String,
+    @SerializedName("session_id") val sessionId: String,
+    @SerializedName("exit_ip")    val exitIp: String?
+)
+
 data class ProxyEventResponse(
     @SerializedName("status") val status: String
 )

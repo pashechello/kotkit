@@ -24,6 +24,12 @@ data class ProxyConfig(
         } else ""
         return "$protocol://${auth}${host}:$port"
     }
+
+    /** Safe for logging — credentials replaced with ***. */
+    fun toMaskedUrl(): String {
+        val auth = if (!username.isNullOrBlank()) "***:***@" else ""
+        return "$protocol://${auth}${host}:$port"
+    }
 }
 
 fun ProxyConfigDto.toDomain(taskId: String) = ProxyConfig(

@@ -1,5 +1,6 @@
 package com.kotkit.basic.proxy
 
+import com.kotkit.basic.BuildConfig
 import timber.log.Timber
 
 /**
@@ -41,11 +42,34 @@ object Tun2SocksEngine {
      * @param proxyUrl SOCKS5/HTTP proxy URL, e.g. "socks5://user:pass@1.2.3.4:1080"
      */
     fun start(tunFd: Int, proxyUrl: String) {
+        // Release-build guard: the stub must NOT silently succeed in production.
+        // If tun2socks.aar is absent in a non-debug build, throw immediately so
+        // the failure surfaces (proxy_connect_failed) rather than posting with the
+        // device's real IP while reporting a fake proxy IP.
+        if (!BuildConfig.DEBUG) {
+            try {
+                Class.forName("tun2socks.Tun2socks")
+            } catch (e: ClassNotFoundException) {
+                error(
+                    "tun2socks.aar not linked — VPN engine unavailable in release build. " +
+                    "See app/libs/BUILD_TUN2SOCKS.md."
+                )
+            }
+        }
+
         if (running) {
             Timber.tag(TAG).w("Engine already running — stopping first")
             stop()
         }
-        Timber.tag(TAG).i("Starting tun2socks: fd=$tunFd proxy=${proxyUrl.substringBefore("@").substringBefore("//").plus("//***@").plus(proxyUrl.substringAfter("@"))}")
+
+        // Mask credentials for logging (handle both auth and no-auth URLs safely)
+        val maskedUrl = if ("@" in proxyUrl) {
+            proxyUrl.substringBefore("//") + "//" + "***@" + proxyUrl.substringAfter("@")
+        } else {
+            proxyUrl
+        }
+        Timber.tag(TAG).i("Starting tun2socks: fd=$tunFd proxy=$maskedUrl")
+
         // TODO: replace with real gomobile call once tun2socks.aar is in app/libs/
         // tun2socks.Tun2socks.start(tunFd, proxyUrl, "warn")
         running = true

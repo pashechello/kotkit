@@ -13,7 +13,10 @@ import com.kotkit.basic.data.local.db.entities.NetworkTaskStatus
 import com.kotkit.basic.data.remote.api.ApiService
 import com.kotkit.basic.data.remote.api.models.ErrorType
 import com.kotkit.basic.data.remote.api.models.ProxyConnectRequest
+import com.kotkit.basic.data.remote.api.models.ProxyDisconnectRequest
 import com.kotkit.basic.data.repository.NetworkTaskRepository
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import com.kotkit.basic.data.repository.WorkerRepository
 import com.kotkit.basic.proxy.ProxyConfig
 import com.kotkit.basic.proxy.ProxyManager
@@ -76,9 +79,10 @@ class NetworkTaskExecutor @Inject constructor(
 
         // Track video path for cleanup on exception
         var downloadedVideoPath: String? = null
-        // Track proxy session for guaranteed teardown
+        // Proxy teardown tracking — proxyConnected guards the finally block
         var proxySessionId: String? = null
         var proxyExitIp: String? = null
+        var proxyConnected = false
 
         try {
             // ====================================================================
@@ -158,6 +162,7 @@ class NetworkTaskExecutor @Inject constructor(
                     proxySessionId = config.sessionId
                     try {
                         proxyExitIp = proxyManager.connect(config)
+                        proxyConnected = true  // Mark connected ONLY after success
                         // Report connect to server (best-effort)
                         runCatching {
                             apiService.reportProxyConnect(
@@ -233,22 +238,9 @@ class NetworkTaskExecutor @Inject constructor(
             }
 
             // ====================================================================
-            // Stage 3.5: Disconnect Proxy
-            // ====================================================================
-            onProgress(ExecutionStage.DISCONNECTING_PROXY, 0)
-            if (proxySessionId != null) {
-                proxyManager.disconnect()
-                runCatching {
-                    apiService.reportProxyDisconnect(
-                        proxySessionId!!,
-                        ProxyConnectRequest(task.id, proxySessionId!!, proxyExitIp)
-                    )
-                }
-                onProgress(ExecutionStage.DISCONNECTING_PROXY, 100)
-            }
-
-            // ====================================================================
             // Stage 4: Capture Proof Screenshot
+            // NOTE: proxy disconnect happens in the finally block below,
+            //       covering all exit paths (success, error, cancellation)
             // ====================================================================
             onProgress(ExecutionStage.VERIFYING, 0)
             networkTaskRepository.updateProgress(task.id, NetworkTaskStatus.VERIFYING, 0)
@@ -304,18 +296,7 @@ class NetworkTaskExecutor @Inject constructor(
 
         } catch (e: Exception) {
             Timber.tag(TAG).e(e, "Unexpected error executing task ${task.id}")
-            // Guaranteed proxy teardown — must not mask the original exception
-            if (proxySessionId != null) {
-                try {
-                    proxyManager.disconnect()
-                    runCatching {
-                        apiService.reportProxyDisconnect(
-                            proxySessionId!!,
-                            ProxyConnectRequest(task.id, proxySessionId!!, proxyExitIp)
-                        )
-                    }
-                } catch (_: Exception) {}
-            }
+            // Proxy teardown handled in finally below
             return handleError(
                 task = task,
                 errorType = ErrorType.UNKNOWN_ERROR,
@@ -324,6 +305,23 @@ class NetworkTaskExecutor @Inject constructor(
                 cleanup = downloadedVideoPath != null,
                 videoPath = downloadedVideoPath
             )
+        } finally {
+            // Guaranteed proxy teardown — runs on ALL exit paths:
+            // success return, early return (PostResult.Failed/Retry), exception, cancellation.
+            // NonCancellable ensures this completes even if the coroutine is being cancelled.
+            if (proxyConnected) {
+                withContext(NonCancellable) {
+                    onProgress(ExecutionStage.DISCONNECTING_PROXY, 0)
+                    try { proxyManager.disconnect() } catch (_: Exception) {}
+                    runCatching {
+                        apiService.reportProxyDisconnect(
+                            proxySessionId!!,
+                            ProxyDisconnectRequest(task.id, proxySessionId!!, proxyExitIp)
+                        )
+                    }
+                    onProgress(ExecutionStage.DISCONNECTING_PROXY, 100)
+                }
+            }
         }
     }
 

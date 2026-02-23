@@ -192,7 +192,8 @@ class NetworkTaskWorker @AssistedInject constructor(
             "network_timeout",
             "app_crash",
             "device_reboot",
-            "video_download_failed"
+            "video_download_failed",
+            "proxy_connect_failed"  // transient: proxy may be temporarily unavailable
         )
     }
 

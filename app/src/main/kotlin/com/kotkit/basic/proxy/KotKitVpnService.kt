@@ -32,26 +32,18 @@ class KotKitVpnService : VpnService() {
         const val ACTION_START = "com.kotkit.basic.proxy.VPN_START"
         const val ACTION_STOP  = "com.kotkit.basic.proxy.VPN_STOP"
 
-        private const val EXTRA_HOST     = "proxy_host"
-        private const val EXTRA_PORT     = "proxy_port"
-        private const val EXTRA_USER     = "proxy_user"
-        private const val EXTRA_PASS     = "proxy_pass"
-        private const val EXTRA_PROTOCOL = "proxy_protocol"
-        private const val EXTRA_SESSION  = "proxy_session_id"
+        // Config is held in-memory and consumed once — never put credentials in Intent extras
+        // (extras are visible via `adb shell dumpsys activity services`).
+        @Volatile private var pendingConfig: ProxyConfig? = null
 
         // Shared state — polled by ProxyManager
         @Volatile var tunnelUp: Boolean = false
             private set
 
         fun start(context: Context, config: ProxyConfig) {
+            pendingConfig = config  // pass in-memory, not via Intent extras
             val intent = Intent(context, KotKitVpnService::class.java).apply {
                 action = ACTION_START
-                putExtra(EXTRA_HOST,     config.host)
-                putExtra(EXTRA_PORT,     config.port)
-                putExtra(EXTRA_USER,     config.username ?: "")
-                putExtra(EXTRA_PASS,     config.password ?: "")
-                putExtra(EXTRA_PROTOCOL, config.protocol)
-                putExtra(EXTRA_SESSION,  config.sessionId)
             }
             context.startForegroundService(intent)
         }
@@ -71,14 +63,17 @@ class KotKitVpnService : VpnService() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         return when (intent?.action) {
             ACTION_START -> {
-                val host     = intent.getStringExtra(EXTRA_HOST)     ?: return START_NOT_STICKY
-                val port     = intent.getIntExtra(EXTRA_PORT, 0)
-                val user     = intent.getStringExtra(EXTRA_USER)
-                val pass     = intent.getStringExtra(EXTRA_PASS)
-                val protocol = intent.getStringExtra(EXTRA_PROTOCOL) ?: "socks5"
-                val session  = intent.getStringExtra(EXTRA_SESSION)  ?: ""
-                startTunnel(host, port, user, pass, protocol, session)
-                START_STICKY
+                val config = pendingConfig
+                pendingConfig = null  // consume immediately to prevent reuse
+                if (config == null) {
+                    // Stale restart (e.g. system killed & re-delivered intent with no config).
+                    // Do not start tunnel with unknown credentials.
+                    Timber.tag(TAG).e("ACTION_START received but no pendingConfig — aborting")
+                    stopSelf()
+                    return START_NOT_STICKY
+                }
+                startTunnel(config)
+                START_NOT_STICKY  // don't auto-restart with stale/null intent
             }
             ACTION_STOP -> {
                 stopTunnel()
@@ -89,20 +84,13 @@ class KotKitVpnService : VpnService() {
         }
     }
 
-    private fun startTunnel(
-        host: String,
-        port: Int,
-        user: String?,
-        pass: String?,
-        protocol: String,
-        sessionId: String
-    ) {
+    private fun startTunnel(config: ProxyConfig) {
         // Must call startForeground() quickly (within 5s of startForegroundService)
         startForeground(NOTIFICATION_ID, buildNotification())
 
         try {
             val builder = Builder()
-                .setSession("KotKit-Proxy-$sessionId")
+                .setSession("KotKit-Proxy-${config.sessionId}")
                 .addAddress("10.233.233.1", 30)     // TUN subnet
                 .addDnsServer("8.8.8.8")
                 .addDnsServer("8.8.4.4")
@@ -112,10 +100,17 @@ class KotKitVpnService : VpnService() {
 
             // Exclude our own app — heartbeat/logs must reach kotkit backend directly,
             // not through the proxy. TikTok (com.zhiliaoapp.musically) is NOT excluded.
+            // CRITICAL: if exclusion fails, abort — we must never route our own API
+            // traffic through the proxy and risk credential leakage.
             try {
                 builder.addDisallowedApplication("com.kotkit.basic")
             } catch (e: Exception) {
-                Timber.tag(TAG).w("addDisallowedApplication failed: ${e.message}")
+                Timber.tag(TAG).e(
+                    "addDisallowedApplication failed — aborting tunnel to prevent " +
+                    "kotkit API traffic leaking through proxy: ${e.message}"
+                )
+                tunnelUp = false
+                return
             }
 
             val tun = builder.establish()
@@ -127,10 +122,9 @@ class KotKitVpnService : VpnService() {
             }
 
             tunInterface = tun
-            val proxyUrl = buildProxyUrl(protocol, host, port, user, pass)
-            Tun2SocksEngine.start(tun.fd, proxyUrl)
+            Tun2SocksEngine.start(tun.fd, config.toProxyUrl())
             tunnelUp = true
-            Timber.tag(TAG).i("VPN tunnel up: fd=${tun.fd} proxyUrl masked")
+            Timber.tag(TAG).i("VPN tunnel up: fd=${tun.fd} host=${config.host}:${config.port}")
 
         } catch (e: Exception) {
             Timber.tag(TAG).e(e, "Failed to start VPN tunnel")
@@ -180,19 +174,8 @@ class KotKitVpnService : VpnService() {
         super.onDestroy()
     }
 
-    private fun buildProxyUrl(
-        protocol: String,
-        host: String,
-        port: Int,
-        user: String?,
-        pass: String?
-    ): String {
-        val auth = if (!user.isNullOrBlank() && !pass.isNullOrBlank()) "$user:$pass@" else ""
-        return "$protocol://${auth}${host}:$port"
-    }
-
     private fun buildNotification(): Notification {
-        return NotificationCompat.Builder(this, App.CHANNEL_POSTING)
+        return NotificationCompat.Builder(this, App.CHANNEL_VPN)
             .setContentTitle("VPN прокси активен")
             .setSmallIcon(R.drawable.ic_upload)
             .setPriority(NotificationCompat.PRIORITY_MIN)

@@ -17,6 +17,7 @@
     <string name="notification_channel_posting">Posting Status</string>
     <string name="notification_channel_alerts">Post Alerts</string>
     <string name="notification_channel_scheduled">Scheduled Posts</string>
+    <string name="notification_channel_vpn">VPN Proxy</string>
 
     <!-- Worker Mode Notifications -->
     <string name="worker_notif_executing">🚀 Executing task…</string>

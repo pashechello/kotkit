@@ -122,8 +122,19 @@ class App : Application(), Configuration.Provider {
                 setSound(getSoundUri(SoundType.MEOW_WARNING), audioAttributes)
             }
 
+            // VPN channel - silent, min priority (legal Android VPN requirement)
+            val vpnChannel = NotificationChannel(
+                CHANNEL_VPN,
+                getString(R.string.notification_channel_vpn),
+                NotificationManager.IMPORTANCE_MIN
+            ).apply {
+                description = getString(R.string.notification_channel_vpn)
+                setShowBadge(false)
+                setSound(null, null)
+            }
+
             notificationManager.createNotificationChannels(
-                listOf(postingChannel, alertsChannel, scheduledChannel)
+                listOf(postingChannel, alertsChannel, scheduledChannel, vpnChannel)
             )
         }
     }
@@ -133,8 +144,9 @@ class App : Application(), Configuration.Provider {
     }
 
     companion object {
-        const val CHANNEL_POSTING = "posting_channel"
-        const val CHANNEL_ALERTS = "alerts_channel"
+        const val CHANNEL_POSTING   = "posting_channel"
+        const val CHANNEL_ALERTS    = "alerts_channel"
         const val CHANNEL_SCHEDULED = "scheduled_channel"
+        const val CHANNEL_VPN       = "vpn_channel"
     }
 }
