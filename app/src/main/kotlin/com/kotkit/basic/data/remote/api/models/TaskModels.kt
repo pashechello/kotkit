@@ -132,4 +132,8 @@ object ErrorType {
 
     // Duplicate protection
     const val DUPLICATE_VIDEO = "duplicate_video"
+
+    // Proxy / VPN errors (Phase 2)
+    const val PROXY_CONFIG_FAILED  = "proxy_config_failed"
+    const val PROXY_CONNECT_FAILED = "proxy_connect_failed"
 }

@@ -53,7 +53,7 @@ class ScreenUnlocker @Inject constructor(
 
     suspend fun ensureUnlocked(): UnlockResult {
         val totalStartTime = System.currentTimeMillis()
-        Timber.tag(TAG).w("⏱️ ensureUnlocked: starting")
+        Timber.tag(TAG).w("⏱️ ensureUnlocked: starting (manufacturer=${Build.MANUFACTURER})")
 
         // 1. Wake screen and wait for it to actually be on
         val wakeStartTime = System.currentTimeMillis()
@@ -65,6 +65,19 @@ class ScreenUnlocker @Inject constructor(
         while (!screenWaker.isScreenOn() && System.currentTimeMillis() - wakeStartTime < maxWakeWaitMs) {
             delay(wakeCheckInterval)
         }
+
+        // Fallback: On OnePlus/OxygenOS, WakeLock with ACQUIRE_CAUSES_WAKEUP does NOT fully
+        // wake the screen — it stays in Dozing/AOD. Launch WakeActivity to force a real wake.
+        if (!screenWaker.isScreenOn()) {
+            Timber.tag(TAG).w("WakeLock failed to wake screen, trying WakeActivity fallback")
+            screenWaker.wakeViaActivity()
+            val activityWakeStart = System.currentTimeMillis()
+            while (!screenWaker.isScreenOn() && System.currentTimeMillis() - activityWakeStart < 2000L) {
+                delay(wakeCheckInterval)
+            }
+            Timber.tag(TAG).w("WakeActivity result: screenOn=${screenWaker.isScreenOn()}")
+        }
+
         // Extra settle time for keyguard to fully initialize after screen on.
         // EMUI 12 (com.huawei.android.launcher) initializes slower than MIUI — needs 800ms.
         val settleMs = if (Build.MANUFACTURER?.lowercase()?.contains("huawei") == true) 800L else 500L

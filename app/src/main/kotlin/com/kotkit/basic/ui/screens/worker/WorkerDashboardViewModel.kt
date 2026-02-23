@@ -16,6 +16,7 @@ import com.kotkit.basic.data.repository.WorkerRepository
 import com.kotkit.basic.executor.screenshot.MediaProjectionConsentActivity
 import com.kotkit.basic.executor.screenshot.MediaProjectionScreenshot
 import com.kotkit.basic.network.NetworkWorkerService
+import com.kotkit.basic.proxy.VpnConsentActivity
 import com.kotkit.basic.permission.AutostartHelper
 import com.kotkit.basic.permission.BatteryOptimizationHelper
 import com.kotkit.basic.permission.DeviceProtectionChecker
@@ -315,7 +316,7 @@ class WorkerDashboardViewModel @Inject constructor(
                 }
 
                 if (newIsActive) {
-                    startWorkerWithScreenshotConsent()
+                    startWorkerWithVpnConsent()
                 } else {
                     MediaProjectionScreenshot.release()
                     NetworkWorkerService.stop(application)
@@ -334,7 +335,23 @@ class WorkerDashboardViewModel @Inject constructor(
     }
 
     /**
-     * On API 29, request MediaProjection consent before starting the worker service.
+     * Step 1 of 2: Request VPN consent (one-time system dialog).
+     * If already consented, proceeds directly to screenshot consent.
+     */
+    private fun startWorkerWithVpnConsent() {
+        VpnConsentActivity.start(application) { granted ->
+            if (granted) {
+                Timber.tag(TAG).i("VPN consent granted, proceeding to screenshot consent")
+                startWorkerWithScreenshotConsent()
+            } else {
+                Timber.tag(TAG).w("VPN consent denied")
+                rollbackWorkerToggle("VPN permission required for Worker Mode")
+            }
+        }
+    }
+
+    /**
+     * Step 2 of 2: On API 29, request MediaProjection consent before starting the worker service.
      * On API 30+, start directly (screenshots use AccessibilityService.takeScreenshot()).
      * If consent is denied or initialization fails, rollback the toggle.
      */
@@ -343,14 +360,12 @@ class WorkerDashboardViewModel @Inject constructor(
             Timber.tag(TAG).i("API ${Build.VERSION.SDK_INT}: requesting MediaProjection consent")
             MediaProjectionConsentActivity.start(application) { granted ->
                 if (granted) {
-                    val initialized = MediaProjectionScreenshot.initialize(application)
-                    if (initialized) {
-                        Timber.tag(TAG).i("MediaProjection initialized, starting worker")
-                        NetworkWorkerService.start(application)
-                    } else {
-                        Timber.tag(TAG).e("MediaProjection initialization failed")
-                        rollbackWorkerToggle("Screenshot setup failed")
-                    }
+                    // Token is stored in MediaProjectionTokenHolder.
+                    // Do NOT call getMediaProjection() here — on API 29, it requires
+                    // an active foreground service with FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION.
+                    // The service will initialize MediaProjection after startForeground().
+                    Timber.tag(TAG).i("MediaProjection consent granted, starting worker service")
+                    NetworkWorkerService.start(application)
                 } else {
                     Timber.tag(TAG).w("MediaProjection consent denied")
                     rollbackWorkerToggle("Screen recording permission required for Worker Mode")

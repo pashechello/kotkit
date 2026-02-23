@@ -29,6 +29,9 @@ android {
         }
     }
 
+    // NDK required for tun2socks.aar (Phase 2 VPN)
+    ndkVersion = "27.2.12479018"
+
     defaultConfig {
         applicationId = "com.kotkit.basic"
         minSdk = 26
@@ -99,6 +102,10 @@ ksp {
 }
 
 dependencies {
+    // tun2socks AAR (Phase 2 VPN) — place compiled tun2socks.aar in app/libs/
+    // Build: gomobile bind -target=android/arm64,android/amd64 -o tun2socks.aar ./engine/...
+    implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.aar", "*.jar"))))
+
     // Core
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.appcompat:appcompat:1.6.1")

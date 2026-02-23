@@ -39,7 +39,8 @@ class AutostartHelper @Inject constructor(
             "huawei", "honor",              // EMUI / MagicOS
             "oppo", "realme", "oneplus",    // ColorOS / OxygenOS
             "vivo", "iqoo",                 // FuntouchOS / OriginOS
-            "asus"                           // ZenUI
+            "asus",                          // ZenUI
+            "meizu"                          // FlymeOS
         )
     }
 
@@ -120,6 +121,7 @@ class AutostartHelper @Inject constructor(
             manufacturer.contains("oneplus") -> "OnePlus"
             manufacturer.contains("vivo") || manufacturer.contains("iqoo") -> "Vivo"
             manufacturer.contains("asus") -> "Asus"
+            manufacturer.contains("meizu") -> "Meizu"
             else -> manufacturer.replaceFirstChar { it.uppercase() }
         }
     }
@@ -255,6 +257,9 @@ class AutostartHelper @Inject constructor(
             }
             manufacturer.contains("asus") -> {
                 openAsusAutostart()
+            }
+            manufacturer.contains("meizu") -> {
+                openMeizuAutostart()
             }
             else -> {
                 Timber.tag(TAG).w("No manual fallback for manufacturer: $manufacturer")
@@ -553,6 +558,45 @@ class AutostartHelper @Inject constructor(
     }
 
     /**
+     * Meizu / FlymeOS: Открывает Permission Manager или Smart Assistant.
+     *
+     * Цепочка fallback:
+     * 1. com.meizu.safe AutoStartManangerActivity (Flyme 7+)
+     * 2. com.meizu.safe SmartAssistantActivity (Flyme 6)
+     * 3. com.meizu.permission PermissionMainActivity (старые Flyme)
+     */
+    private fun openMeizuAutostart(): Boolean {
+        // Try 1: Flyme 7+ Permission Manager → Autostart
+        return tryStartActivity(
+            Intent().apply {
+                component = ComponentName(
+                    "com.meizu.safe",
+                    "com.meizu.safe.permission.ui.AutoStartManangerActivity"
+                )
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }, "Meizu Autostart Manager"
+        ) || tryStartActivity(
+            // Try 2: Flyme 6 Smart Assistant
+            Intent().apply {
+                component = ComponentName(
+                    "com.meizu.safe",
+                    "com.meizu.safe.SmartAssistantActivity"
+                )
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }, "Meizu Smart Assistant"
+        ) || tryStartActivity(
+            // Try 3: Старые Flyme Permission Manager
+            Intent().apply {
+                component = ComponentName(
+                    "com.meizu.permission",
+                    "com.meizu.permission.ui.PermissionMainActivity"
+                )
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }, "Meizu Permission Manager"
+        )
+    }
+
+    /**
      * Возвращает инструкцию для пользователя как включить автозапуск на его устройстве.
      * Показывается в диалоге ручных инструкций когда автоматическое открытие не сработало.
      *
@@ -564,7 +608,8 @@ class AutostartHelper @Inject constructor(
                 "Включите ВСЕ разрешения: Автозапуск, Показ на экране блокировки, Всплывающие окна"
             }
             manufacturer.contains("samsung") -> {
-                "Настройки → Обслуживание устройства → Батарея → Ограничения в фоне → Никогда не переводить в спящий режим → Добавьте KotKit"
+                "Шаг 1: Настройки → Обслуживание устройства → Батарея → Ограничения в фоне → Никогда не переводить в спящий режим → Добавьте KotKit. " +
+                "Шаг 2: Настройки → Обслуживание устройства → Батарея → Адаптивная экономия заряда → выключите или исключите KotKit"
             }
             manufacturer.contains("huawei") || manufacturer.contains("honor") -> {
                 "Настройки → Приложения → Запуск приложений → KotKit → Управлять вручную → Включите ВСЕ: Автозапуск, Вторичный запуск, Работа в фоне"
@@ -577,6 +622,9 @@ class AutostartHelper @Inject constructor(
             }
             manufacturer.contains("asus") -> {
                 "Mobile Manager → Автозапуск → KotKit → Разрешить"
+            }
+            manufacturer.contains("meizu") -> {
+                "Безопасность (или Настройки → Разрешения) → Автозапуск → KotKit → Разрешить"
             }
             else -> {
                 "Найдите настройки автозапуска или оптимизации батареи и добавьте KotKit в исключения"
@@ -596,7 +644,10 @@ class AutostartHelper @Inject constructor(
                 listOf("Автозапуск", "Показ на экране блокировки", "Всплывающие окна")
             }
             manufacturer.contains("samsung") -> {
-                listOf("KotKit добавлен в «Никогда не переводить в спящий режим»")
+                listOf(
+                    "KotKit добавлен в «Никогда не переводить в спящий режим»",
+                    "Адаптивная экономия заряда выключена или KotKit исключён"
+                )
             }
             manufacturer.contains("huawei") || manufacturer.contains("honor") -> {
                 listOf("Автозапуск", "Вторичный запуск", "Работа в фоне")
@@ -608,6 +659,9 @@ class AutostartHelper @Inject constructor(
                 listOf("Автозапуск", "Работа в фоне")
             }
             manufacturer.contains("asus") -> {
+                listOf("Автозапуск")
+            }
+            manufacturer.contains("meizu") -> {
                 listOf("Автозапуск")
             }
             else -> {

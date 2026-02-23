@@ -10,9 +10,14 @@ import com.kotkit.basic.data.local.db.entities.NetworkTaskEntity
 import com.kotkit.basic.data.local.db.entities.PostEntity
 import com.kotkit.basic.data.local.db.entities.PostStatus
 import com.kotkit.basic.data.local.db.entities.NetworkTaskStatus
+import com.kotkit.basic.data.remote.api.ApiService
 import com.kotkit.basic.data.remote.api.models.ErrorType
+import com.kotkit.basic.data.remote.api.models.ProxyConnectRequest
 import com.kotkit.basic.data.repository.NetworkTaskRepository
 import com.kotkit.basic.data.repository.WorkerRepository
+import com.kotkit.basic.proxy.ProxyConfig
+import com.kotkit.basic.proxy.ProxyManager
+import com.kotkit.basic.proxy.toDomain
 import com.kotkit.basic.scheduler.DeviceStateChecker
 import com.kotkit.basic.scheduler.PublishCheckResult
 import com.kotkit.basic.scheduler.PublishConditions
@@ -36,7 +41,9 @@ class NetworkTaskExecutor @Inject constructor(
     private val postingAgent: PostingAgent,
     private val screenshotManager: ScreenshotManager,
     private val deviceStateChecker: DeviceStateChecker,
-    private val workerRepository: WorkerRepository
+    private val workerRepository: WorkerRepository,
+    private val proxyManager: ProxyManager,
+    private val apiService: ApiService
 ) {
     companion object {
         private const val TAG = "NetworkTaskExecutor"
@@ -69,6 +76,9 @@ class NetworkTaskExecutor @Inject constructor(
 
         // Track video path for cleanup on exception
         var downloadedVideoPath: String? = null
+        // Track proxy session for guaranteed teardown
+        var proxySessionId: String? = null
+        var proxyExitIp: String? = null
 
         try {
             // ====================================================================
@@ -136,6 +146,48 @@ class NetworkTaskExecutor @Inject constructor(
             }
 
             // ====================================================================
+            // Stage 2.7: Connect Proxy
+            // ====================================================================
+            onProgress(ExecutionStage.CONNECTING_PROXY, 0)
+
+            val proxyConfigResult = runCatching { apiService.getProxyConfig(task.id) }
+            if (proxyConfigResult.isSuccess) {
+                val proxyResponse = proxyConfigResult.getOrThrow()
+                if (proxyResponse.required && proxyResponse.proxy != null) {
+                    val config: ProxyConfig = proxyResponse.proxy.toDomain(task.id)
+                    proxySessionId = config.sessionId
+                    try {
+                        proxyExitIp = proxyManager.connect(config)
+                        // Report connect to server (best-effort)
+                        runCatching {
+                            apiService.reportProxyConnect(
+                                config.sessionId,
+                                ProxyConnectRequest(task.id, config.sessionId, proxyExitIp)
+                            )
+                        }
+                        onProgress(ExecutionStage.CONNECTING_PROXY, 100)
+                    } catch (e: Exception) {
+                        Timber.tag(TAG).e(e, "Proxy connection failed for task ${task.id}")
+                        return handleError(
+                            task = task,
+                            errorType = ErrorType.PROXY_CONNECT_FAILED,
+                            message = "Proxy connection failed: ${e.message}"
+                        )
+                    }
+                } else {
+                    Timber.tag(TAG).i("Proxy not required for task ${task.id}")
+                    onProgress(ExecutionStage.CONNECTING_PROXY, 100)
+                }
+            } else {
+                Timber.tag(TAG).e("Failed to get proxy config for task ${task.id}: ${proxyConfigResult.exceptionOrNull()?.message}")
+                return handleError(
+                    task = task,
+                    errorType = ErrorType.PROXY_CONFIG_FAILED,
+                    message = "Could not get proxy config: ${proxyConfigResult.exceptionOrNull()?.message}"
+                )
+            }
+
+            // ====================================================================
             // Stage 3: Post to TikTok
             // ====================================================================
             onProgress(ExecutionStage.POSTING, 0)
@@ -178,6 +230,21 @@ class NetworkTaskExecutor @Inject constructor(
                 is PostResult.Retry -> {
                     return ExecutionResult.Retry(postResult.reason)
                 }
+            }
+
+            // ====================================================================
+            // Stage 3.5: Disconnect Proxy
+            // ====================================================================
+            onProgress(ExecutionStage.DISCONNECTING_PROXY, 0)
+            if (proxySessionId != null) {
+                proxyManager.disconnect()
+                runCatching {
+                    apiService.reportProxyDisconnect(
+                        proxySessionId!!,
+                        ProxyConnectRequest(task.id, proxySessionId!!, proxyExitIp)
+                    )
+                }
+                onProgress(ExecutionStage.DISCONNECTING_PROXY, 100)
             }
 
             // ====================================================================
@@ -237,6 +304,18 @@ class NetworkTaskExecutor @Inject constructor(
 
         } catch (e: Exception) {
             Timber.tag(TAG).e(e, "Unexpected error executing task ${task.id}")
+            // Guaranteed proxy teardown — must not mask the original exception
+            if (proxySessionId != null) {
+                try {
+                    proxyManager.disconnect()
+                    runCatching {
+                        apiService.reportProxyDisconnect(
+                            proxySessionId!!,
+                            ProxyConnectRequest(task.id, proxySessionId!!, proxyExitIp)
+                        )
+                    }
+                } catch (_: Exception) {}
+            }
             return handleError(
                 task = task,
                 errorType = ErrorType.UNKNOWN_ERROR,
@@ -352,7 +431,9 @@ enum class ExecutionStage {
     GETTING_URL,
     DOWNLOADING,
     WAITING_SCREEN_OFF,
+    CONNECTING_PROXY,
     POSTING,
+    DISCONNECTING_PROXY,
     VERIFYING,
     COMPLETING,
     COMPLETED

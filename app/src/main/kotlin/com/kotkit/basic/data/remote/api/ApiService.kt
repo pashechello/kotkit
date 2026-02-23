@@ -192,6 +192,25 @@ interface ApiService {
     ): LogUploadResponse
 
     // ========================================================================
+    // Network Mode - Proxy Endpoints (Phase 2 VPN)
+    // ========================================================================
+
+    @GET("api/v1/proxy/config/{task_id}")
+    suspend fun getProxyConfig(@Path("task_id") taskId: String): ProxyConfigResponse
+
+    @POST("api/v1/proxy/sessions/{session_id}/connect")
+    suspend fun reportProxyConnect(
+        @Path("session_id") sessionId: String,
+        @Body request: ProxyConnectRequest
+    ): ProxyEventResponse
+
+    @POST("api/v1/proxy/sessions/{session_id}/disconnect")
+    suspend fun reportProxyDisconnect(
+        @Path("session_id") sessionId: String,
+        @Body request: ProxyConnectRequest
+    ): ProxyEventResponse
+
+    // ========================================================================
     // Network Mode - Verification Endpoints (Post & Check anti-fraud)
     // ========================================================================
 
@@ -226,4 +245,11 @@ interface ApiService {
         @Query("limit") limit: Int = 20,
         @Query("offset") offset: Int = 0
     ): CompletedTasksResponse
+
+    // ========================================================================
+    // Network Mode - Warmup Reporting
+    // ========================================================================
+
+    @POST("api/v1/warmup/report")
+    suspend fun reportWarmup(@Body request: WarmupReportRequest): WarmupReportResponse
 }

@@ -198,13 +198,15 @@ class NetworkTaskWorker @AssistedInject constructor(
 
     private fun createProgressNotification(stage: ExecutionStage, progress: Int): android.app.Notification {
         val title = when (stage) {
-            ExecutionStage.GETTING_URL -> "Получение ссылки..."
-            ExecutionStage.DOWNLOADING -> "Скачивание видео..."
+            ExecutionStage.GETTING_URL        -> "Получение ссылки..."
+            ExecutionStage.DOWNLOADING        -> "Скачивание видео..."
             ExecutionStage.WAITING_SCREEN_OFF -> "Ожидание блокировки экрана..."
-            ExecutionStage.POSTING -> "Публикация в TikTok..."
-            ExecutionStage.VERIFYING -> "Проверка публикации..."
-            ExecutionStage.COMPLETING -> "Завершение задачи..."
-            ExecutionStage.COMPLETED -> "Задача завершена"
+            ExecutionStage.CONNECTING_PROXY   -> "Подключение прокси..."
+            ExecutionStage.POSTING            -> "Публикация в TikTok..."
+            ExecutionStage.DISCONNECTING_PROXY -> "Отключение прокси..."
+            ExecutionStage.VERIFYING          -> "Проверка публикации..."
+            ExecutionStage.COMPLETING         -> "Завершение задачи..."
+            ExecutionStage.COMPLETED          -> "Задача завершена"
         }
 
         val builder = NotificationCompat.Builder(context, App.CHANNEL_POSTING)

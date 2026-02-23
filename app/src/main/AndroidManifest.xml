@@ -24,6 +24,9 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
 
+    <!-- VPN (Phase 2) -->
+    <uses-permission android:name="android.permission.BIND_VPN_SERVICE" />
+
     <!-- Wake Lock -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
@@ -88,6 +91,17 @@
                 <data android:scheme="kotkit" android:host="auth" />
             </intent-filter>
         </activity>
+
+        <!-- WakeActivity: transparent Activity to force screen wake on OEMs where WakeLock fails (OnePlus) -->
+        <activity
+            android:name=".executor.screen.WakeActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity="" />
 
         <!-- MediaProjection consent dialog (transparent, API 29 screenshot fallback) -->
         <activity
@@ -200,6 +214,25 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_provider_paths" />
         </provider>
+
+        <!-- VPN Proxy Service (Phase 2) -->
+        <service
+            android:name=".proxy.KotKitVpnService"
+            android:exported="false"
+            android:permission="android.permission.BIND_VPN_SERVICE"
+            android:foregroundServiceType="dataSync">
+            <intent-filter>
+                <action android:name="android.net.VpnService" />
+            </intent-filter>
+        </service>
+
+        <!-- VPN Consent Activity (transparent, one-time consent dialog) -->
+        <activity
+            android:name=".proxy.VpnConsentActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:excludeFromRecents="true"
+            android:noHistory="true" />
 
         <!-- Firebase Cloud Messaging Service -->
         <service

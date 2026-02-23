@@ -58,6 +58,7 @@ import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import com.kotkit.basic.executor.accessibility.portal.UITree
 import com.kotkit.basic.executor.accessibility.portal.UITreeParser
+import com.kotkit.basic.executor.screen.WakeActivity
 import com.kotkit.basic.executor.screenshot.MediaProjectionScreenshot
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -363,7 +364,15 @@ class TikTokAccessibilityService : AccessibilityService() {
             // 2. Wake screen (skip if caller already did it)
             if (!screenAlreadyAwake) {
                 wakeScreen()
-                kotlinx.coroutines.delay(500)
+                // Wait for screen to fully wake. On OnePlus, WakeActivity fallback needs
+                // extra time to launch and turn on the screen.
+                val powerManager = getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+                val wakeStart = System.currentTimeMillis()
+                while (!powerManager.isInteractive && System.currentTimeMillis() - wakeStart < 2000) {
+                    kotlinx.coroutines.delay(50)
+                }
+                kotlinx.coroutines.delay(500) // settle time for keyguard
+                Timber.tag(TAG).i("enterPin: screen wake done, isInteractive=${powerManager.isInteractive}")
             }
 
             val screenWidth = resources.displayMetrics.widthPixels
@@ -372,19 +381,20 @@ class TikTokAccessibilityService : AccessibilityService() {
             val swipeStartY = (screenHeight * 0.9f).toInt()
             val swipeEndY = (screenHeight * 0.4f).toInt()
 
-            // 3. Swipe up + poll for PIN pad (with retry)
-            // Each attempt checks active window and presses HOME if our app is above keyguard.
-            // This prevents the race condition where rootInActiveWindow changes between
-            // the initial check and the swipe (MIUI can bring our app to foreground mid-flow).
+            // 3. Bring up PIN bouncer + poll for PIN pad (with retry)
+            // Strategy order:
+            //   a) requestDismissKeyguard via WakeActivity (works on all OEMs including OnePlus)
+            //   b) Lock icon click (Pixel/AOSP fast path)
+            //   c) Swipe up (MIUI, Samsung fallback)
             var initialCoords: Map<Char, Pair<Int, Int>>? = null
-            val maxSwipeAttempts = 2
-            for (attempt in 1..maxSwipeAttempts) {
+            val maxAttempts = 3
+            for (attempt in 1..maxAttempts) {
                 val currentRoot = rootInActiveWindow?.packageName?.toString()
-                Timber.tag(TAG).i("enterPin: attempt $attempt/$maxSwipeAttempts (activeRoot=$currentRoot)")
+                Timber.tag(TAG).i("enterPin: attempt $attempt/$maxAttempts (activeRoot=$currentRoot)")
 
-                // Ensure lockscreen is in foreground before swiping.
+                // Ensure lockscreen is in foreground before trying to unlock.
                 // On MIUI, our app may render above the keyguard after screen wake.
-                // HOME press surfaces the lockscreen so swipe targets the correct layer.
+                // HOME press surfaces the lockscreen so gestures target the correct layer.
                 // On EMUI 12, the keyguard is owned by com.huawei.android.launcher.
                 val onLockscreen = currentRoot == null || currentRoot in LOCKSCREEN_PACKAGES
                 if (!onLockscreen) {
@@ -393,32 +403,59 @@ class TikTokAccessibilityService : AccessibilityService() {
                     kotlinx.coroutines.delay(500)
                 }
 
-                // Try lock icon first (Pixel/AOSP fast path)
+                // Strategy A: requestDismissKeyguard via WakeActivity.
+                // This is the proper Android API to bring up the PIN bouncer.
+                //
+                // SKIP on OnePlus/OxygenOS: configEnabled=false disables PrimaryBouncer entirely,
+                // so requestDismissKeyguard immediately fires onDismissCancelled. Worse, WakeActivity
+                // stays alive for 5s with occluded=true — the lock icon is hidden behind it and any
+                // dispatchGesture tap goes to WakeActivity instead of the keyguard.
+                val isOnePlus = Build.MANUFACTURER?.lowercase()?.contains("oneplus") == true
+                if (attempt == 1 && !isOnePlus) {
+                    Timber.tag(TAG).i("enterPin: requesting bouncer via requestDismissKeyguard")
+                    try {
+                        val intent = android.content.Intent(this, WakeActivity::class.java).apply {
+                            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_NO_ANIMATION)
+                            putExtra(WakeActivity.EXTRA_DISMISS_KEYGUARD, true)
+                        }
+                        startActivity(intent)
+                    } catch (e: Exception) {
+                        Timber.tag(TAG).e("Failed to launch WakeActivity for bouncer", e)
+                    }
+                    initialCoords = pollForPinPad(maxWaitMs = 3000, pollIntervalMs = 200)
+                    if (initialCoords != null) {
+                        Timber.tag(TAG).i("enterPin: requestDismissKeyguard brought up PIN pad")
+                        break
+                    }
+                    Timber.tag(TAG).w("enterPin: requestDismissKeyguard didn't show PIN pad, trying other strategies")
+                } else if (attempt == 1 && isOnePlus) {
+                    Timber.tag(TAG).i("enterPin: OnePlus detected — skipping requestDismissKeyguard (configEnabled=false), going straight to lock icon tap")
+                }
+
+                // Strategy B: Try lock icon click (Pixel/AOSP fast path)
                 val clickedLockIcon = tryClickLockIcon()
                 if (clickedLockIcon) {
                     Timber.tag(TAG).i("enterPin: clicked lock icon, checking for bouncer")
-                    // Quick check: did the lock icon actually bring up the PIN pad?
                     initialCoords = pollForPinPad(maxWaitMs = 1500, pollIntervalMs = 200)
                     if (initialCoords != null) {
                         Timber.tag(TAG).i("enterPin: lock icon worked, PIN pad appeared")
                         break
                     }
-                    // Lock icon click didn't produce PIN pad (Samsung false positive or timing)
                     Timber.tag(TAG).w("enterPin: lock icon clicked but no PIN pad, falling back to swipe")
                 }
 
-                // Swipe up (MIUI, Samsung, and fallback for failed lock icon click)
+                // Strategy C: Swipe up (MIUI, Samsung, and fallback)
                 swipe(swipeX, swipeStartY, swipeX, swipeEndY, 300)
                 initialCoords = pollForPinPad(maxWaitMs = 4000, pollIntervalMs = 200)
                 if (initialCoords != null) break
 
-                if (attempt < maxSwipeAttempts) {
+                if (attempt < maxAttempts) {
                     Timber.tag(TAG).w("enterPin: PIN pad not found on attempt $attempt, retrying...")
                 }
             }
 
             if (initialCoords == null) {
-                Timber.tag(TAG).e("enterPin: failed to find PIN pad after $maxSwipeAttempts swipe attempts")
+                Timber.tag(TAG).e("enterPin: failed to find PIN pad after $maxAttempts attempts")
                 return false
             }
             Timber.tag(TAG).i("enterPin: PIN pad detected with ${initialCoords.size} digits")
@@ -476,7 +513,7 @@ class TikTokAccessibilityService : AccessibilityService() {
      *
      * @return true if the lock icon was found and clicked
      */
-    private fun tryClickLockIcon(): Boolean {
+    private suspend fun tryClickLockIcon(): Boolean {
         // EMUI fast path: lockscreen does not have a tappable lock icon.
         // Skip AOSP strategies entirely — enterPin() will fall back to swipe.
         if (Build.MANUFACTURER?.lowercase()?.contains("huawei") == true) {
@@ -495,7 +532,7 @@ class TikTokAccessibilityService : AccessibilityService() {
         for (window in windowsList) {
             val root = window.root ?: continue
 
-            // Strategy 1: find by view ID (works on some AOSP versions)
+            // Strategy 1a: find by view ID — AOSP/Pixel
             val nodes = root.findAccessibilityNodeInfosByViewId(
                 "com.android.systemui:id/device_entry_icon_view"
             )
@@ -504,8 +541,48 @@ class TikTokAccessibilityService : AccessibilityService() {
                 val result = lockIcon.performAction(AccessibilityNodeInfo.ACTION_CLICK)
                 nodes.forEach { it.recycle() }
                 root.recycle()
-                Timber.tag(TAG).i("tryClickLockIcon: found by viewId, clicked result=$result")
+                Timber.tag(TAG).i("tryClickLockIcon: found by AOSP viewId, clicked result=$result")
                 return result
+            }
+
+            // Strategy 1b: find by view ID — OnePlus/OxygenOS
+            // OnePlus uses lock_icon_view at the TOP of the screen (not bottom like Pixel).
+            // The lock_icon container (FrameLayout) is marked clickable=true in the UI tree.
+            // We try three sub-strategies in order:
+            //   b1) performAction(ACTION_CLICK) on the lock_icon node itself
+            //   b2) performAction(ACTION_CLICK) on its clickable parent FrameLayout
+            //   b3) dispatchGesture tap at node center coordinates (last resort)
+            val oplusNodes = root.findAccessibilityNodeInfosByViewId(
+                "com.android.systemui:id/lock_icon_view"
+            )
+            if (!oplusNodes.isNullOrEmpty()) {
+                val lockIcon = oplusNodes[0]
+                val bounds = android.graphics.Rect()
+                lockIcon.getBoundsInScreen(bounds)
+                val tapX = (bounds.left + bounds.right) / 2
+                val tapY = (bounds.top + bounds.bottom) / 2
+
+                // b1: performAction on the lock_icon_view node
+                val clickResult = lockIcon.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                Timber.tag(TAG).i("tryClickLockIcon: OnePlus lock_icon_view at ($tapX, $tapY), performAction result=$clickResult")
+
+                if (!clickResult) {
+                    // b2: try parent (the FrameLayout container which is clickable=true)
+                    val parent = lockIcon.parent
+                    if (parent != null) {
+                        val parentClick = parent.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                        Timber.tag(TAG).i("tryClickLockIcon: parent performAction result=$parentClick")
+                        parent.recycle()
+                    }
+                }
+
+                oplusNodes.forEach { it.recycle() }
+                root.recycle()
+
+                // b3: also dispatch a gesture tap as belt-and-suspenders
+                Timber.tag(TAG).i("tryClickLockIcon: also trying dispatchGesture tap at ($tapX, $tapY)")
+                tap(tapX, tapY)
+                return true
             }
 
             // Strategy 2: traverse tree for clickable node in bottom 25% of screen
@@ -927,12 +1004,15 @@ class TikTokAccessibilityService : AccessibilityService() {
     }
 
     /**
-     * Wake the screen using PowerManager WakeLock
+     * Wake the screen using PowerManager WakeLock, with WakeActivity fallback.
+     * On OnePlus/OxygenOS, WakeLock alone leaves screen in Dozing/AOD.
      */
     @Suppress("DEPRECATION")
     private fun wakeScreen() {
+        val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+
+        // Try WakeLock first (works on Xiaomi/MIUI, Samsung, Pixel)
         try {
-            val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
             val wakeLock = powerManager.newWakeLock(
                 PowerManager.SCREEN_BRIGHT_WAKE_LOCK or
                 PowerManager.ACQUIRE_CAUSES_WAKEUP or
@@ -940,9 +1020,23 @@ class TikTokAccessibilityService : AccessibilityService() {
                 "kotkit:test_wake"
             )
             wakeLock.acquire(3000L)
-            Timber.tag(TAG).i("Screen wake requested")
+            Timber.tag(TAG).i("Screen wake requested via WakeLock")
         } catch (e: Exception) {
-            Timber.tag(TAG).e("Failed to wake screen", e)
+            Timber.tag(TAG).e("Failed to wake screen via WakeLock", e)
+        }
+
+        // Fallback: if screen is still not interactive, launch WakeActivity.
+        // On OnePlus/OxygenOS, WakeLock does NOT fully wake the screen.
+        if (!powerManager.isInteractive) {
+            Timber.tag(TAG).w("WakeLock did not wake screen, launching WakeActivity fallback")
+            try {
+                val intent = android.content.Intent(this, WakeActivity::class.java).apply {
+                    addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_NO_ANIMATION)
+                }
+                startActivity(intent)
+            } catch (e: Exception) {
+                Timber.tag(TAG).e("Failed to launch WakeActivity", e)
+            }
         }
     }
 

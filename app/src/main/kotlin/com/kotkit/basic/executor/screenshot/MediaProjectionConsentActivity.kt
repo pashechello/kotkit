@@ -56,8 +56,17 @@ class MediaProjectionConsentActivity : Activity() {
                 Timber.tag(TAG).w("MediaProjection consent DENIED (resultCode=$resultCode)")
             }
 
-            onConsentResult?.invoke(granted)
+            val callback = onConsentResult
             onConsentResult = null
+            if (callback != null) {
+                callback.invoke(granted)
+            } else {
+                // Process was killed and restarted — callback is lost.
+                // Token is stored in MediaProjectionTokenHolder (if granted).
+                // User must re-toggle Worker Mode.
+                Timber.tag(TAG).w("onConsentResult callback is null (process death?). " +
+                    "Token stored=${MediaProjectionTokenHolder.hasToken}")
+            }
         }
 
         finish()

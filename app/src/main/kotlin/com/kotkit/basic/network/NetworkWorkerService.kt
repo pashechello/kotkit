@@ -24,6 +24,7 @@ import com.kotkit.basic.data.repository.NetworkTaskRepository
 import com.kotkit.basic.data.repository.WorkerRepository
 import com.kotkit.basic.executor.accessibility.TikTokAccessibilityService
 import com.kotkit.basic.executor.screenshot.MediaProjectionScreenshot
+import com.kotkit.basic.executor.screenshot.MediaProjectionTokenHolder
 import com.kotkit.basic.scheduler.DeviceStateChecker
 import com.kotkit.basic.ui.components.SnackbarController
 import com.kotkit.basic.warmup.WarmupAgent
@@ -185,18 +186,31 @@ class NetworkWorkerService : Service() {
         val notification = createNotification(activeTasksCount = 0, todayEarnings = 0f, completedToday = 0)
 
         // Determine foreground service type explicitly.
-        // On API 29: include mediaProjection type (if consent granted) for VirtualDisplay screenshot fallback.
+        // On API 29: include mediaProjection type (if consent token stored) for VirtualDisplay screenshot fallback.
         // On API 30+: only dataSync — screenshots use AccessibilityService.takeScreenshot().
         // CRITICAL: Never call startForeground() without an explicit type when the manifest declares
         // mediaProjection — Android 14+ infers ALL manifest types, triggering SecurityException
         // if mediaProjection consent hasn't been obtained.
-        val fgsType = if (Build.VERSION.SDK_INT == Build.VERSION_CODES.Q && MediaProjectionScreenshot.isAvailable) {
+        // NOTE: Check hasToken (not isAvailable) because MediaProjection is initialized AFTER startForeground().
+        val fgsType = if (Build.VERSION.SDK_INT == Build.VERSION_CODES.Q && MediaProjectionTokenHolder.hasToken) {
             android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION or
                 android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
         } else {
             android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
         }
         startForeground(NOTIFICATION_ID, notification, fgsType)
+
+        // Initialize MediaProjection for API 29 screenshot fallback.
+        // MUST happen AFTER startForeground() with MEDIA_PROJECTION type —
+        // Android 10 requires an active foreground service before getMediaProjection().
+        if (Build.VERSION.SDK_INT == Build.VERSION_CODES.Q && MediaProjectionTokenHolder.hasToken) {
+            val mpInitialized = MediaProjectionScreenshot.initialize(this)
+            if (mpInitialized) {
+                Timber.tag(TAG).i("MediaProjection initialized successfully inside foreground service")
+            } else {
+                Timber.tag(TAG).e("MediaProjection initialization failed inside foreground service")
+            }
+        }
 
         // Update notification with real data asynchronously
         serviceScope.launch {

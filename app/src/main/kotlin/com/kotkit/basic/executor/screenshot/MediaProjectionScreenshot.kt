@@ -74,6 +74,11 @@ object MediaProjectionScreenshot {
             cachedProjection = projection
             Timber.tag(TAG).i("MediaProjection initialized successfully")
             true
+        } catch (e: SecurityException) {
+            Timber.tag(TAG).e(e, "SecurityException: foreground service with MEDIA_PROJECTION type " +
+                "required before getMediaProjection() on API ${android.os.Build.VERSION.SDK_INT}")
+            MediaProjectionTokenHolder.clear()
+            false
         } catch (e: Exception) {
             Timber.tag(TAG).e(e, "Failed to initialize MediaProjection")
             MediaProjectionTokenHolder.clear()
